@@ -58,6 +58,16 @@ caller can reason about (latency, partition, auth); mechanism is not.
   `RemoteInvocable` (`Mcp`/`Webhook`) without the caller, the engine, or the
   schema package noticing.
 
+## Status note (2026-06-24)
+
+`ProcessInvocable` is **built** (`src/Invocables/ProcessInvocable.php`, TDD'd):
+a `Binding::Local` Invocable that spawns the configured argv via the Laravel
+`Process` facade, passing the payload as JSON over stdin and decoding JSON
+stdout, surfacing a non-zero exit's stderr and non-JSON output as a
+`RuntimeException`. The first consumer is the app-side `ProcessOtioValidator`
+(splicewire-app ADR-0038), which binds it to timeline-schema's `OtioValidator`
+seam, off by default.
+
 ## Consequences
 
 - `popcorn` gains `Invocables/ProcessInvocable` and depends on no Python bridge.
