@@ -13,7 +13,7 @@ use Rushing\Popcorn\Contracts\Invocable;
  * no HTTP or MCP client; the host plugs whichever it uses. This is how a tenant
  * overrides a named capability with their own remote handler.
  */
-final class RemoteInvocable implements Invocable
+class RemoteInvocable implements Invocable
 {
     private Closure $transport;
 
@@ -21,10 +21,10 @@ final class RemoteInvocable implements Invocable
      * @param  callable(string, array<string, mixed>): array<string, mixed>  $transport
      */
     public function __construct(
-        private readonly string $name,
-        private readonly Binding $binding,
+        private string $name,
+        private Binding $binding,
         callable $transport,
-        private readonly ?string $endpoint = null,
+        private ?string $endpoint = null,
     ) {
         if ($binding === Binding::Local) {
             throw new InvalidArgumentException('RemoteInvocable is for mcp/webhook bindings; use LocalInvocable for local.');

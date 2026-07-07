@@ -17,7 +17,7 @@ use Rushing\Popcorn\Contracts\Invocable;
  * TTL semantics: a null TTL caches with no expiry (the `snapshot` scope — frozen for identical inputs);
  * a positive TTL expires the entry (the `invocation` scope — a memoized call shared across callers).
  */
-final class CachedInvocable implements Invocable
+class CachedInvocable implements Invocable
 {
     private Closure $keyFor;
 
@@ -26,10 +26,10 @@ final class CachedInvocable implements Invocable
      * @param  int|null  $ttl  seconds; null caches with no expiry
      */
     public function __construct(
-        private readonly Invocable $inner,
-        private readonly CacheRepository $cache,
+        private Invocable $inner,
+        private CacheRepository $cache,
         callable $keyFor,
-        private readonly ?int $ttl = null,
+        private ?int $ttl = null,
     ) {
         $this->keyFor = $keyFor(...);
     }

@@ -10,7 +10,7 @@ use Rushing\Popcorn\Contracts\Invocable;
  * invocable under an existing name overrides it — the seam where a host swaps a
  * local default for a tenant's webhook without callers changing.
  */
-final class InvocableRegistry
+class InvocableRegistry
 {
     /** @var array<string, Invocable> */
     private array $invocables = [];

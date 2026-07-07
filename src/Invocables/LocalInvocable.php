@@ -7,7 +7,7 @@ use Rushing\Popcorn\Binding;
 use Rushing\Popcorn\Contracts\Invocable;
 
 /** An invocable backed by a local PHP handler — the in-process default. */
-final class LocalInvocable implements Invocable
+class LocalInvocable implements Invocable
 {
     private Closure $handler;
 
@@ -15,9 +15,9 @@ final class LocalInvocable implements Invocable
      * @param  callable(array<string, mixed>): array<string, mixed>  $handler
      */
     public function __construct(
-        private readonly string $name,
+        private string $name,
         callable $handler,
-        private readonly ?string $description = null,
+        private ?string $description = null,
     ) {
         $this->handler = $handler(...);
     }

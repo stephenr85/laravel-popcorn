@@ -9,10 +9,10 @@ namespace Rushing\Popcorn\Strategy;
  * floor. Per-region demotion (a clean front resolved by the strong rung, an
  * ambiguous tail by a weaker one) is just calling resolve per region.
  */
-final class StrategyLadder
+class StrategyLadder
 {
     /** @var Strategy[] */
-    private readonly array $rungs;
+    private array $rungs;
 
     public function __construct(
         Strategy ...$rungs,
