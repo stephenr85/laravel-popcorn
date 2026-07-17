@@ -22,6 +22,18 @@ class InvocableRegistry
         return $this;
     }
 
+    /**
+     * Remove an invocable by name — the teardown half of a per-tenant overlay: a host
+     * projects tenant-scoped invocables on a tenant switch and forgets them on revert,
+     * so nothing bleeds across tenants on a shared worker. A no-op if absent.
+     */
+    public function forget(string $name): static
+    {
+        unset($this->invocables[$name]);
+
+        return $this;
+    }
+
     public function has(string $name): bool
     {
         return isset($this->invocables[$name]);
