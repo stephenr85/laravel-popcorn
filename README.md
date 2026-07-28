@@ -66,6 +66,48 @@ tenant switch and drop them on revert, so nothing bleeds across tenants.
 The transport for a `RemoteInvocable` is injected (`fn(string $name, array $input): array`),
 so the kernel depends on no HTTP or MCP client of its own — the host plugs in whichever it uses.
 
+## The Runner substrate — scoped, documented code execution
+
+`ProcessInvocable` spawns a raw subprocess with **zero isolation**. The **Runner substrate** is its
+disciplined successor: it turns *scoped, documented code execution* into a first-class primitive, so a
+host can safely run code it did not author (a tenant's transform, a published community tool). Four
+value objects behind one mechanism contract — **still array-in / array-out**, so the whole kernel above
+composes over a sandboxed run unchanged:
+
+| Noun | What it is |
+|---|---|
+| **`Manifest`** | *What* to run — `name`, `runtime` (`python@3.12`, `javy`, …), `entrypoint`, `files`. Canonically a `popcorn.json` file; loaded into an immutable VO. Optional publishing metadata (`input`/`output` schema, requested grants) a simple internal transform omits. |
+| **`Grant`** | *What it's allowed* — `paths.ro/rw`, `net` (`none`/`scoped`/`open`), `env` allowlist, `limits`, `seccompProfile`. **Deny-by-default** (`Grant::none()` is the floor). A superset DTO that maps onto both bwrap and wasmtime. |
+| **`Result`** | *What came back* — a **total** VO (every run returns one), a closed `Outcome` enum, bounded `rawOutput()`/`stderr()`, and compute telemetry. `->output()` decodes the array-out; `->throw()` maps the outcome to a typed `RunFailed`. |
+| **`Runner`** | The executor: `run(Manifest, Grant, array $input): Result`. **One implementation per isolation-backend, never per language** — the runtime lives in the Manifest. |
+
+```php
+use Rushing\Popcorn\Invocables\RunnerInvocable;
+use Rushing\Popcorn\Runner\{Manifest, Grant, NullRunner};
+
+$manifest = Manifest::fromFile('/bundles/shape-payload/popcorn.json');
+$grant    = Grant::none();                 // effective grant, resolved host-side (never a superset of the request)
+
+// A RunnerInvocable IS an Invocable — cache it, ladder it, override it by name, all unchanged.
+$registry->register(new RunnerInvocable('shape-payload', new NullRunner, $manifest, $grant));
+$registry->invoke('shape-payload', ['raw' => '…']);   // → run(...)->throw()->output()
+```
+
+**Requested vs. effective grants** are the security core: a Manifest *requests* an honest upper bound;
+the host resolves the **effective** grant per-invocation as `requested ∩ policy` (deny-by-default, never
+a superset) and passes *that* to `run()`. The kernel consumes an effective `Grant`; it never sources one
+— policy custody stays host-side.
+
+The kernel ships **no** bwrap/wasmtime dependency. It ships the contract and one dependency-free Runner —
+**`NullRunner`** (runs the argv unsandboxed, `sandboxed: false`, the CI-fast / pure-wiring path). Real
+isolation lives in substrate packages: **`rushing/laravel-popcorn-bubble`** (bwrap, Linux) and
+**`rushing/laravel-popcorn-wasm`** (wasmtime, everywhere incl. macOS). *Which* Runner answers is a
+host-capability resolution.
+
+> **`ProcessInvocable` is soft-deprecated.** It is exactly "a `RunnerInvocable` over `NullRunner` with an
+> empty `Grant`, made concrete before the seam existed." It stays shipped and working (its live consumers
+> are untouched); route all *new* execution work through `RunnerInvocable`.
+
 ## Caching
 
 `CachedInvocable` wraps **any** invocable and memoizes its array-out result per a
