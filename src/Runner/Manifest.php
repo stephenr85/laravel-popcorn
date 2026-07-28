@@ -48,7 +48,33 @@ class Manifest
         public ?Link $link = null,
         public ?string $engineVersion = null,
         public ?string $description = null,
+        public ?string $bundleRoot = null,
     ) {}
+
+    /**
+     * The bundle root — the host directory holding `entrypoint` + `files`, which a substrate binds
+     * into the sandbox (e.g. bubble's `--ro-bind $bundleRoot /pkg`). "The file *is* the bundle root"
+     * (ticket 05): {@see Manifest::fromFile()} sets it to the manifest's own directory. When a
+     * Manifest is built from an array (e.g. derived from a DB-stored transform), the host stages the
+     * files and stamps the root with {@see Manifest::withBundleRoot()}.
+     */
+    public function withBundleRoot(string $bundleRoot): self
+    {
+        $clone = clone $this;
+        $clone->bundleRoot = $bundleRoot;
+
+        return $clone;
+    }
+
+    /** The absolute host path to the entrypoint (bundleRoot-joined when relative), for the NullRunner / degrade path. */
+    public function entrypointPath(): string
+    {
+        if ($this->bundleRoot === null || str_starts_with($this->entrypoint, '/')) {
+            return $this->entrypoint;
+        }
+
+        return rtrim($this->bundleRoot, '/').'/'.$this->entrypoint;
+    }
 
     /**
      * Load + validate a `popcorn.json` file into the runtime VO. The `entrypoint`/`files` are
@@ -75,7 +101,7 @@ class Manifest
             throw new InvalidManifest("popcorn: manifest at `{$path}` must decode to a JSON object.");
         }
 
-        return self::fromArray($decoded);
+        return self::fromArray($decoded)->withBundleRoot(dirname($path));
     }
 
     /**

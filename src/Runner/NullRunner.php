@@ -126,7 +126,7 @@ class NullRunner implements Runner
     /** @return list<string> */
     private function argv(Manifest $manifest): array
     {
-        return [$this->interpreterFor($manifest->runtime), $manifest->entrypoint];
+        return [$this->interpreterFor($manifest->runtime), $manifest->entrypointPath()];
     }
 
     private function interpreterFor(string $runtime): string

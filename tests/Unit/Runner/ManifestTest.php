@@ -89,3 +89,23 @@ it('loads and validates a popcorn.json file', function () {
 it('throws InvalidManifest for a missing or non-JSON file', function () {
     expect(fn () => Manifest::fromFile('/no/such/popcorn.json'))->toThrow(InvalidManifest::class);
 });
+
+it('treats the manifest file directory as the bundle root and joins relative entrypoints', function () {
+    $dir = sys_get_temp_dir().'/popcorn-bundle-'.uniqid();
+    mkdir($dir);
+    file_put_contents($dir.'/popcorn.json', json_encode([
+        'name' => 'b', 'runtime' => 'node@22', 'entrypoint' => 'index.js',
+    ]));
+
+    $m = Manifest::fromFile($dir.'/popcorn.json');
+
+    expect($m->bundleRoot)->toBe($dir)
+        ->and($m->entrypointPath())->toBe($dir.'/index.js');
+
+    // A host-staged Manifest stamps the root explicitly; an absolute entrypoint is left alone.
+    $staged = Manifest::fromArray(['name' => 'b', 'runtime' => 'node', 'entrypoint' => 'e.js'])->withBundleRoot('/stage');
+    expect($staged->entrypointPath())->toBe('/stage/e.js');
+
+    unlink($dir.'/popcorn.json');
+    rmdir($dir);
+});
