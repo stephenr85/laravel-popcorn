@@ -6,6 +6,7 @@ use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Process;
 use JsonException;
 use Rushing\Popcorn\Contracts\Runner;
+use Rushing\Popcorn\Runner\Concerns\HandlesRunnerIo;
 
 /**
  * The kernel-shipped, dependency-free {@see Runner}: it runs the Manifest's argv with **no
@@ -25,11 +26,7 @@ use Rushing\Popcorn\Contracts\Runner;
  */
 class NullRunner implements Runner
 {
-    /** Hard cap on the captured value channel; a breach is a {@see Outcome::MalformedOutput}, never a silent truncation. */
-    private const OUTPUT_HARD_CAP_BYTES = 262144; // 256 KiB
-
-    /** Tail cap on the diagnostic side-channel — the last N bytes, since a diagnostic is at the end. */
-    private const STDERR_TAIL_BYTES = 16384; // 16 KiB
+    use HandlesRunnerIo;
 
     private const DEFAULT_WALL_SECONDS = 60;
 
@@ -148,19 +145,5 @@ class NullRunner implements Runner
     private function encode(array $data): string
     {
         return json_encode($data, JSON_THROW_ON_ERROR);
-    }
-
-    private function isJsonObject(string $candidate): bool
-    {
-        try {
-            return is_array(json_decode($candidate, true, flags: JSON_THROW_ON_ERROR));
-        } catch (JsonException) {
-            return false;
-        }
-    }
-
-    private function tail(string $value, int $bytes): string
-    {
-        return strlen($value) > $bytes ? substr($value, -$bytes) : $value;
     }
 }
