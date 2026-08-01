@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Rushing\Popcorn\Discovery;
 
 use ReflectionClass;
@@ -27,7 +25,7 @@ use Symfony\Component\Finder\Finder;
  *  - only attribute-carrying classes are returned — an un-attributed class under a scanned path is
  *    ignored, so a path may point at a whole Data directory.
  */
-final class AttributedClassScanner
+class AttributedClassScanner
 {
     /**
      * Scan the given filesystem paths and return the class-strings carrying $attributeClass.
