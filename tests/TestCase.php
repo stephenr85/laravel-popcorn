@@ -3,7 +3,7 @@
 namespace Rushing\Popcorn\Tests;
 
 use Orchestra\Testbench\TestCase as Orchestra;
-use Rushing\Popcorn\PopcornServiceProvider;
+use Rushing\Popcorn\Laravel\PopcornServiceProvider;
 
 abstract class TestCase extends Orchestra
 {

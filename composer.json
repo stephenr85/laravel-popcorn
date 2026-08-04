@@ -13,6 +13,7 @@
         "php": "^8.3",
         "illuminate/contracts": "^11.0|^12.0|^13.0",
         "illuminate/support": "^11.0|^12.0|^13.0",
+        "rushing/php-popcorn": "dev-main",
         "symfony/finder": "^6.0|^7.0|^8.0"
     },
     "require-dev": {
@@ -22,7 +23,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Rushing\\Popcorn\\": "src/"
+            "Rushing\\Popcorn\\Laravel\\": "src/"
         }
     },
     "autoload-dev": {
@@ -33,7 +34,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Rushing\\Popcorn\\PopcornServiceProvider"
+                "Rushing\\Popcorn\\Laravel\\PopcornServiceProvider"
             ]
         }
     },
@@ -43,9 +44,19 @@
         },
         "sort-packages": true
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../php-popcorn",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "minimum-stability": "dev",
     "prefer-stable": true,
     "scripts": {
-        "pint": "@php -d memory_limit=512M vendor/bin/pint"
+        "pint": "@php -d memory_limit=512M vendor/bin/pint",
+        "test": "@php vendor/bin/pest"
     }
 }

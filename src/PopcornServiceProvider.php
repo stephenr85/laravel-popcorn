@@ -1,8 +1,9 @@
 <?php
 
-namespace Rushing\Popcorn;
+namespace Rushing\Popcorn\Laravel;
 
 use Illuminate\Support\ServiceProvider;
+use Rushing\Popcorn\InvocableRegistry;
 
 class PopcornServiceProvider extends ServiceProvider
 {

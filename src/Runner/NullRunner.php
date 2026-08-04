@@ -1,12 +1,16 @@
 <?php
 
-namespace Rushing\Popcorn\Runner;
+namespace Rushing\Popcorn\Laravel\Runner;
 
 use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Process;
 use JsonException;
 use Rushing\Popcorn\Contracts\Runner;
 use Rushing\Popcorn\Runner\Concerns\HandlesRunnerIo;
+use Rushing\Popcorn\Runner\Grant;
+use Rushing\Popcorn\Runner\Manifest;
+use Rushing\Popcorn\Runner\Outcome;
+use Rushing\Popcorn\Runner\Result;
 
 /**
  * The kernel-shipped, dependency-free {@see Runner}: it runs the Manifest's argv with **no

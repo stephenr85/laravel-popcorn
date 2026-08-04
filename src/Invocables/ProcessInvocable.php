@@ -1,6 +1,6 @@
 <?php
 
-namespace Rushing\Popcorn\Invocables;
+namespace Rushing\Popcorn\Laravel\Invocables;
 
 use Illuminate\Support\Facades\Process;
 use JsonException;

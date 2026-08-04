@@ -2,8 +2,8 @@
 
 use Rushing\Popcorn\Binding;
 use Rushing\Popcorn\Contracts\Runner;
-use Rushing\Popcorn\Invocables\CachedInvocable;
 use Rushing\Popcorn\Invocables\RunnerInvocable;
+use Rushing\Popcorn\Laravel\Invocables\CachedInvocable;
 use Rushing\Popcorn\Runner\Exceptions\NonZeroExit;
 use Rushing\Popcorn\Runner\Grant;
 use Rushing\Popcorn\Runner\Manifest;

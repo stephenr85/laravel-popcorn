@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Process;
 use Rushing\Popcorn\Binding;
-use Rushing\Popcorn\Invocables\ProcessInvocable;
+use Rushing\Popcorn\Laravel\Invocables\ProcessInvocable;
 
 it('reports a local binding', function () {
     $invocable = new ProcessInvocable('otio.validate', ['python3', 'validate.py']);

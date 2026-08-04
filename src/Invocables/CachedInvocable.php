@@ -1,6 +1,6 @@
 <?php
 
-namespace Rushing\Popcorn\Invocables;
+namespace Rushing\Popcorn\Laravel\Invocables;
 
 use Closure;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
