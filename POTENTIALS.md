@@ -46,8 +46,6 @@ Seven real execution sites; rehome in ascending churn:
 5. **npx-vitest docs regen** *(later)*.
 6. `command -v` probes + tenancy `->run()` — **leave alone** (not execution-of-authored-code).
 
-Ordered rehome tickets live at `.scratch/popcorn-runner-rehome/`.
-
 ## Net-new advertised
 
 - **Conduit RunnerTransforms** — sandboxed, user-authored transforms of another tool (ADR-0141).
