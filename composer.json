@@ -46,11 +46,8 @@
     },
     "repositories": [
         {
-            "type": "path",
-            "url": "../php-popcorn",
-            "options": {
-                "symlink": true
-            }
+            "type": "git",
+            "url": "https://github.com/stephenr85/php-popcorn.git"
         }
     ],
     "minimum-stability": "dev",
