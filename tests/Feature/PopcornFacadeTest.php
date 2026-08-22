@@ -4,6 +4,8 @@ use Rushing\Popcorn\Binding;
 use Rushing\Popcorn\Contracts\Invocable;
 use Rushing\Popcorn\InvocableRegistry;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
+use Rushing\Popcorn\Laravel\PopcornManager;
+use Rushing\Popcorn\Registries\RegistryIndex;
 
 function fakeInvocable(string $name, callable $fn): Invocable
 {
@@ -28,13 +30,15 @@ function fakeInvocable(string $name, callable $fn): Invocable
     };
 }
 
-it('resolves the InvocableRegistry singleton as its facade accessor', function () {
+it('resolves the PopcornManager as its facade accessor', function () {
+    // The accessor moved off the kernel type in registry-kernel ticket 20: a Laravel-side affordance
+    // cannot hang off a package declaring `mustNotRequire: illuminate/*`.
     expect(Popcorn::getFacadeRoot())
-        ->toBeInstanceOf(InvocableRegistry::class)
-        ->toBe(app(InvocableRegistry::class));
+        ->toBeInstanceOf(PopcornManager::class)
+        ->toBe(app(PopcornManager::class));
 });
 
-it('dispatches invoke($uri, $envelope) through the InvocableRegistry', function () {
+it('still dispatches invoke($uri, $envelope), forwarded through the manager', function () {
     app(InvocableRegistry::class)->register(
         fakeInvocable('greet', fn (array $input) => ['hello' => $input['name']])
     );
@@ -44,11 +48,11 @@ it('dispatches invoke($uri, $envelope) through the InvocableRegistry', function 
 });
 
 it('is fakeable via a container swap', function () {
-    $fake = new class extends InvocableRegistry
+    $fake = new class(app(RegistryIndex::class), app(InvocableRegistry::class)) extends PopcornManager
     {
-        public function invoke(string $name, array $input): array
+        public function invoke(string $uri, array $envelope): array
         {
-            return ['faked' => $name];
+            return ['faked' => $uri];
         }
     };
 

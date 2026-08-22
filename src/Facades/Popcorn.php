@@ -3,34 +3,36 @@
 namespace Rushing\Popcorn\Laravel\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use Rushing\Popcorn\InvocableRegistry;
+use Rushing\Popcorn\Laravel\PopcornManager;
 
 /**
- * Ergonomic front door to the json-ns handler dispatch.
+ * Front door to the registry kernel: resolve any key in the estate without naming a registry first.
  *
- * @method static array invoke(string $name, array $input)
- * @method static bool has(string $name)
+ * The accessor is {@see PopcornManager}, not a kernel type — see that class for why the Laravel-side
+ * root has to exist, and why its surface is closed. `pop`/`tryPop` are this side's words; the kernel
+ * interface stays `resolve()`/`tryResolve()` (registry-kernel tickets 06 D14/D15, 13 D6, 20).
  *
- * @see InvocableRegistry
+ * ```php
+ * Popcorn::pop('beam.particle.resources.invoices');   // routed by longest prefix, no registry named
+ * Popcorn::registry('beam.particle.resources');       // the owning registry object, with its sugar
+ * ```
+ *
+ * @method static mixed pop(\Rushing\Popcorn\Registries\RegistryKey|string $key)
+ * @method static mixed tryPop(\Rushing\Popcorn\Registries\RegistryKey|string $key)
+ * @method static object|null registry(\Rushing\Popcorn\Registries\RegistryKey|string $root)
+ * @method static \Rushing\Popcorn\Registries\Registry|null routeTo(\Rushing\Popcorn\Registries\RegistryKey|string $key)
+ * @method static \Rushing\Popcorn\Registries\RegistryIndex index()
+ * @method static \Rushing\Popcorn\Laravel\PopcornManager authorizeWith(?\Rushing\Popcorn\Registries\Authorizer $authorizer)
+ * @method static list<string> suggest(\Rushing\Popcorn\Registries\RegistryKey|string $key, int $limit = 3, int $within = 3)
+ * @method static array invoke(string $uri, array $envelope)
+ * @method static bool has(string $uri)
+ *
+ * @see PopcornManager
  */
 class Popcorn extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return InvocableRegistry::class;
-    }
-
-    /**
-     * Dispatch a json-ns handler by URI with the given envelope.
-     *
-     * Resolves the underlying {@see InvocableRegistry} and calls
-     * `invoke($name, array $input)` — the handler-dispatch front door.
-     *
-     * @param  array<string, mixed>  $envelope
-     * @return array<string, mixed>
-     */
-    public static function invoke(string $uri, array $envelope): array
-    {
-        return static::getFacadeRoot()->invoke($uri, $envelope);
+        return PopcornManager::class;
     }
 }
