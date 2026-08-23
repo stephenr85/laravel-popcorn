@@ -5,6 +5,7 @@ namespace Rushing\Popcorn\Laravel;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Rushing\Popcorn\InvocableRegistry;
+use Rushing\Popcorn\Laravel\Console\RegistriesCommand;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
 use Rushing\Popcorn\Registries\RegistryIndex;
 
@@ -34,6 +35,13 @@ class PopcornServiceProvider extends ServiceProvider
     {
         if (class_exists(AliasLoader::class)) {
             AliasLoader::getInstance()->alias('Popcorn', Popcorn::class);
+        }
+
+        if ($this->app->runningInConsole()) {
+            // The index of indexes. Relocated here from `splicewire/laravel-beam`'s
+            // `splicewire:beam:manifests` with the index it renders (registry-kernel ticket 21) — full
+            // cutover, no alias, and the beam command is gone rather than deprecated.
+            $this->commands([RegistriesCommand::class]);
         }
     }
 }
