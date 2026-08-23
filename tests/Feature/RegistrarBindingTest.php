@@ -48,7 +48,9 @@ it('discovers annotated class-strings and touches no registry doing it', functio
     expect($found)->toBe([Rushing\Popcorn\Tests\Fixtures\AnnotatedThing::class])
         // The index is untouched: `discover()` is a finder, not a fill surface. Sugaring one of the
         // registrars onto the facade would have implied the attribute one is privileged (07 D10).
-        ->and(app(RegistryIndex::class)->unfiltered()->keys())->toHaveCount(1);
+        // Two describes at boot, not one, since ticket 30: the self-hosting index and this package's own
+        // `popcorn.invocables` — the first estate registry to reach the index at all.
+        ->and(app(RegistryIndex::class)->unfiltered()->keys())->toHaveCount(2);
 });
 
 it('renders a registry fill sources in popcorn:registries, derived rather than declared', function () {

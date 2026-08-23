@@ -3,7 +3,6 @@
 namespace Rushing\Popcorn\Laravel;
 
 use Rushing\Popcorn\Discovery\AttributedClassScanner;
-use Rushing\Popcorn\InvocableRegistry;
 use Rushing\Popcorn\Registries\Authorizer;
 use Rushing\Popcorn\Registries\Exceptions\AmbiguousRegistryMatch;
 use Rushing\Popcorn\Registries\Exceptions\UnregisteredRegistry;
@@ -49,7 +48,6 @@ class PopcornManager
 {
     public function __construct(
         private RegistryIndex $index,
-        private InvocableRegistry $invocables,
     ) {}
 
     /** The index itself, for describing into and for tooling that walks the whole tree. */
@@ -211,27 +209,5 @@ class PopcornManager
         $entries = config($key, []);
 
         return new ConfigRegistrar(is_array($entries) ? $entries : [], $key);
-    }
-
-    /**
-     * Dispatch a json-ns handler by URI.
-     *
-     * Forwarded unchanged to {@see InvocableRegistry} — the accessor moved to this class, the
-     * implementation did not. Re-expressing invocable dispatch as a read through the index is
-     * registry-kernel ticket 30's cutover, and coupling two unblocked tickets to avoid one forwarding
-     * method would have been the worse trade. This is not a deprecation alias: it is the same method on
-     * its new host, waiting to be collapsed.
-     *
-     * @param  array<string, mixed>  $envelope
-     * @return array<string, mixed>
-     */
-    public function invoke(string $uri, array $envelope): array
-    {
-        return $this->invocables->invoke($uri, $envelope);
-    }
-
-    public function has(string $uri): bool
-    {
-        return $this->invocables->has($uri);
     }
 }

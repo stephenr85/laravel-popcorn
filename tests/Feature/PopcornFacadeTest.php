@@ -38,26 +38,39 @@ it('resolves the PopcornManager as its facade accessor', function () {
         ->toBe(app(PopcornManager::class));
 });
 
-it('still dispatches invoke($uri, $envelope), forwarded through the manager', function () {
+it('reaches an invocable through the registry door, now that the forward is gone', function () {
+    // Ticket 20 parked `Popcorn::invoke($uri, …)` here for ticket 30 to collapse. It collapsed by
+    // DELETION rather than re-pointing — its live callers pass a json-ns URI, which is a foreign key and
+    // therefore unroutable through the index (20 D3). The round trip is kept, through the owner's door.
     app(InvocableRegistry::class)->register(
         fakeInvocable('greet', fn (array $input) => ['hello' => $input['name']])
     );
 
-    expect(Popcorn::invoke('greet', ['name' => 'world']))
+    expect(Popcorn::registry('popcorn.invocables'))->toBeInstanceOf(InvocableRegistry::class)
+        ->and(Popcorn::registry('popcorn.invocables')->invoke('greet', ['name' => 'world']))
         ->toBe(['hello' => 'world']);
 });
 
+it('routes a bare invocable key through the index like any other registry entry', function () {
+    app(InvocableRegistry::class)->register(fakeInvocable('greet', fn () => []));
+
+    // Keys are absolute out (20 D2), so an invocable is addressable in the global keyspace — which is
+    // exactly what a foreign-keyed json-ns handler is NOT.
+    expect(Popcorn::pop('popcorn.invocables.greet'))->toBeInstanceOf(Invocable::class)
+        ->and(Popcorn::tryPop('popcorn.invocables.absent'))->toBeNull();
+});
+
 it('is fakeable via a container swap', function () {
-    $fake = new class(app(RegistryIndex::class), app(InvocableRegistry::class)) extends PopcornManager
+    $fake = new class(app(RegistryIndex::class)) extends PopcornManager
     {
-        public function invoke(string $uri, array $envelope): array
+        public function pop(Rushing\Popcorn\Registries\RegistryKey|string $key): mixed
         {
-            return ['faked' => $uri];
+            return ['faked' => (string) $key];
         }
     };
 
     Popcorn::swap($fake);
 
     expect(Popcorn::getFacadeRoot())->toBe($fake)
-        ->and(Popcorn::invoke('anything', []))->toBe(['faked' => 'anything']);
+        ->and(Popcorn::pop('anything'))->toBe(['faked' => 'anything']);
 });
