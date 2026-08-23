@@ -4,7 +4,9 @@ namespace Rushing\Popcorn\Laravel\Console;
 
 use Illuminate\Console\Command;
 use Rushing\Popcorn\Registries\BasicRegistry;
+use Rushing\Popcorn\Registries\Filled;
 use Rushing\Popcorn\Registries\IsRegistry;
+use Rushing\Popcorn\Registries\Registrar;
 use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 
@@ -27,10 +29,15 @@ use Rushing\Popcorn\Registries\RegistryIndex;
  * - **The `--seam=` filter and the injection legend.** `ManifestSeam` is deleted (ticket 07 D1): its seven
  *   shapes were never a taxonomy of injection points, they were a census of how ~55 registries happened to
  *   get filled *before they shared a contract*. Three of the seven described things that are not registries
- *   or not injection points, one had zero members, and the declared seam lied in three registries. Filtering
- *   is replaced by filtering on **registrar class**, once ticket 24 lands `Registrar`.
- * - **The `Where` column.** Superseded by `Registrar::source()` — derived from the registrars a registry
- *   actually has rather than hand-written beside them, so it cannot drift (07 D4).
+ *   or not injection points, one had zero members, and the declared seam lied in three registries. No filter
+ *   replaces it yet — one on registrar class is trivially addable, and waits for a populated index to be
+ *   worth filtering.
+ * - **The `Where` column, replaced by `Fill from`.** Ticket 24 landed `Registrar::source()`, so the column
+ *   is now DERIVED: a registry reports the registrars it actually holds and each one says where it reads
+ *   from. A hand-written `where` could disagree with the code beside it; this cannot (07 D4).
+ *   A registry with no registrars renders `hand`, which is a fact about it rather than a gap — most of the
+ *   estate's registries are filled by consumers calling `register()`, and saying so is the answer to "how
+ *   do I contribute?"
  * - **The `registerHint` one-liner.** With `of` + `entryType` + the resolve/tryResolve pair, most of the
  *   estate's 52 hand-written hints were derivable; the residue is caveats, which is what `note` carries.
  *   That deleted 52 drift surfaces (01 D10).
@@ -65,12 +72,13 @@ class RegistriesCommand extends Command
         }
 
         $this->table(
-            ['Root', 'Arity (out)', 'Of', 'Entry type', 'Owner'],
+            ['Root', 'Arity (out)', 'Of', 'Entry type', 'Fill from', 'Owner'],
             array_map(static fn (array $r): array => [
                 $r['root'] === '' ? '(root)' : $r['root'],
                 $r['arity'],
                 $r['of'],
                 $r['entryType'],
+                $r['sources'] === [] ? 'hand' : implode("\n", $r['sources']),
                 $r['owner'],
             ], $rows),
         );
@@ -98,7 +106,7 @@ class RegistriesCommand extends Command
      * The declaration is read off the OWNER where there is one — under the sanctioned composition pattern
      * the store is a `BasicRegistry` and the attribute lives on the class that holds it (ticket 20 D6).
      *
-     * @return list<array{root: string, of: string, arity: string, entryType: string, onDuplicate: string, optionality: string, note: string|null, owner: string, order: int}>
+     * @return list<array{root: string, of: string, arity: string, entryType: string, onDuplicate: string, optionality: string, note: string|null, sources: list<string>, owner: string, order: int}>
      */
     protected function rows(RegistryIndex $index): array
     {
@@ -122,6 +130,7 @@ class RegistriesCommand extends Command
                 'onDuplicate' => $declaration->onDuplicate->value,
                 'optionality' => $declaration->optionality->value,
                 'note' => $declaration->note,
+                'sources' => $this->sourcesOf($owner, $store),
                 'owner' => $owner === null ? ($store === null ? '?' : $store::class) : $owner::class,
                 'order' => $declaration->order,
             ];
@@ -130,6 +139,29 @@ class RegistriesCommand extends Command
         usort($rows, static fn (array $a, array $b): int => $a['order'] <=> $b['order']);
 
         return $rows;
+    }
+
+    /**
+     * Where a registry's entries come from, derived by asking it for its registrars.
+     *
+     * Asked of the OWNER first and the store second, in that order, because an owner that composes a
+     * `BasicRegistry` may expose `attach()`/`registrars()` itself — and where it does, its list is the
+     * one a contributor would reach. Falls through to the store, which is where a composed registry's
+     * registrars actually live when the owner does not forward.
+     *
+     * A registry implementing neither reports nothing, and the caller renders that as `hand`.
+     *
+     * @return list<string>
+     */
+    protected function sourcesOf(?object $owner, mixed $store): array
+    {
+        foreach ([$owner, $store] as $candidate) {
+            if ($candidate instanceof Filled) {
+                return array_map(static fn (Registrar $r): string => $r->source(), $candidate->registrars());
+            }
+        }
+
+        return [];
     }
 
     protected function declarationOf(?object $owner, mixed $store): ?IsRegistry

@@ -2,11 +2,13 @@
 
 namespace Rushing\Popcorn\Laravel;
 
+use Rushing\Popcorn\Discovery\AttributedClassScanner;
 use Rushing\Popcorn\InvocableRegistry;
 use Rushing\Popcorn\Registries\Authorizer;
 use Rushing\Popcorn\Registries\Exceptions\AmbiguousRegistryMatch;
 use Rushing\Popcorn\Registries\Exceptions\UnregisteredRegistry;
 use Rushing\Popcorn\Registries\Key;
+use Rushing\Popcorn\Registries\Registrars\ConfigRegistrar;
 use Rushing\Popcorn\Registries\Registry;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Rushing\Popcorn\Registries\RegistryKey;
@@ -166,6 +168,49 @@ class PopcornManager
         usort($scored, static fn (array $a, array $b): int => $a['distance'] <=> $b['distance']);
 
         return array_slice(array_column($scored, 'key'), 0, $limit);
+    }
+
+    /**
+     * The class-strings under `$paths` carrying `$attributeClass` — a pure finder that touches no
+     * registry at all.
+     *
+     * This is what survives of the charter's `discover()`. As a FILL surface it dissolved: filling by
+     * attribute is `new AttributeRegistrar($paths, ParticleResource::class)` attached like any other
+     * registrar, and sugaring one of the registrars on the facade would imply the attribute one is
+     * privileged — the exact seven-seams thinking ticket 07 deleted. As a FIND util it survives intact,
+     * because "an easy way to find the classes for a registry" was the charter's actual want and nothing
+     * else front-doors {@see AttributedClassScanner} (ticket 07 D10).
+     *
+     * Facade-only, per ticket 06's rule that sugar lives on this side and the kernel interface owes it
+     * nothing. Discover-by-`implements` and discover-by-`extends` are deliberately unbuilt: both were in
+     * the charter dump, neither was ever a live case, and they wait for a registry that needs one.
+     *
+     * @param  list<string>  $paths
+     * @param  class-string  $attributeClass
+     * @return list<class-string>
+     */
+    public function discover(array $paths, string $attributeClass, bool $instanceof = true): array
+    {
+        return (new AttributedClassScanner)->scan($paths, $attributeClass, $instanceof);
+    }
+
+    /**
+     * A {@see ConfigRegistrar} over `config($key)` — the whole of the Laravel side of that registrar.
+     *
+     * The kernel class takes an already-read array and cannot call `config()` itself:
+     * `package-topology.mustNotRequire: ["illuminate/*"]` bars it, and the deeper reason is ticket 16's —
+     * an array-in registrar ports to a TS runtime, a `config()` call does not. So the framework read
+     * happens here, in one line, on the only side allowed to make it (ticket 07 D6).
+     *
+     * Missing config is an empty registrar rather than an error: a host that has not published a config
+     * file has contributed nothing, which is not the same as being misconfigured, and
+     * {@see \Rushing\Popcorn\Registries\Optionality} is where a registry says whether empty is a problem.
+     */
+    public function configRegistrar(string $key): ConfigRegistrar
+    {
+        $entries = config($key, []);
+
+        return new ConfigRegistrar(is_array($entries) ? $entries : [], $key);
     }
 
     /**

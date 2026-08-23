@@ -24,6 +24,8 @@ use Rushing\Popcorn\Laravel\PopcornManager;
  * @method static \Rushing\Popcorn\Registries\RegistryIndex index()
  * @method static \Rushing\Popcorn\Laravel\PopcornManager authorizeWith(?\Rushing\Popcorn\Registries\Authorizer $authorizer)
  * @method static list<string> suggest(\Rushing\Popcorn\Registries\RegistryKey|string $key, int $limit = 3, int $within = 3)
+ * @method static list<class-string> discover(array $paths, string $attributeClass, bool $instanceof = true)
+ * @method static \Rushing\Popcorn\Registries\Registrars\ConfigRegistrar configRegistrar(string $key)
  * @method static array invoke(string $uri, array $envelope)
  * @method static bool has(string $uri)
  *
