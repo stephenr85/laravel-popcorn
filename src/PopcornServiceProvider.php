@@ -5,6 +5,7 @@ namespace Rushing\Popcorn\Laravel;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Support\ServiceProvider;
 use Rushing\Popcorn\InvocableRegistry;
+use Rushing\Popcorn\Laravel\Console\KeysCommand;
 use Rushing\Popcorn\Laravel\Console\RegistriesCommand;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
 use Rushing\Popcorn\Registries\RegistryIndex;
@@ -23,7 +24,6 @@ class PopcornServiceProvider extends ServiceProvider
 
         $this->app->scoped(PopcornManager::class, fn ($app) => new PopcornManager(
             $app->make(RegistryIndex::class),
-            $app->make(InvocableRegistry::class),
         ));
 
         // Deliberately NOT installed here, or anywhere in this package: there is exactly one authorizer
@@ -48,8 +48,10 @@ class PopcornServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             // The index of indexes. Relocated here from `splicewire/laravel-beam`'s
             // `splicewire:beam:manifests` with the index it renders (registry-kernel ticket 21) — full
-            // cutover, no alias, and the beam command is gone rather than deprecated.
-            $this->commands([RegistriesCommand::class]);
+            // cutover, no alias, and the beam command is gone rather than deprecated. `popcorn:keys` is
+            // the entry-level half of the same question, and the two are deliberately separate
+            // commands rather than a flag (registry-kernel ticket 13 D10).
+            $this->commands([RegistriesCommand::class, KeysCommand::class]);
         }
     }
 }
