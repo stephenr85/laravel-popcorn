@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Rushing\Popcorn\Registries\Authorizer;
 use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
@@ -20,12 +21,12 @@ uses(TestCase::class)->in('Unit');
  * @param  array<string, mixed>  $entries
  * @param  array<string, array{0: mixed, 1: string}>  $gated  entry plus the ability reading it requires
  */
-function registryAt(string $root, array $entries = [], array $gated = []): BasicRegistry
+function registryAt(string $root, array $entries = [], array $gated = [], RegistryArity|array $arity = RegistryArity::PickOne): BasicRegistry
 {
     $store = new BasicRegistry(new IsRegistry(
         root: $root,
         of: 'test entries',
-        arity: RegistryArity::PickOne,
+        arity: $arity,
     ));
 
     foreach ($entries as $key => $entry) {
@@ -39,6 +40,27 @@ function registryAt(string $root, array $entries = [], array $gated = []): Basic
     app(RegistryIndex::class)->describe($store);
 
     return $store;
+}
+
+/**
+ * A command's full rendered output.
+ *
+ * `$this->artisan()`'s pending assertions test line-by-line expectations; a table cell and a legend that
+ * must both be present, or present exactly once, are assertions about the whole buffer.
+ *
+ * @param  array<string, mixed>  $arguments
+ */
+function commandOutput(string $command, array $arguments = []): string
+{
+    Artisan::call($command, $arguments);
+
+    return Artisan::output();
+}
+
+/** The same, under `--json` — the projection ticket 16 treats as the presumptive wire shape. */
+function commandJson(string $command, array $arguments = []): string
+{
+    return commandOutput($command, $arguments + ['--json' => true]);
 }
 
 /** The bluntest possible host policy, for proving that a read filters at all. */

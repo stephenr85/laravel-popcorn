@@ -75,7 +75,7 @@ class RegistriesCommand extends Command
             ['Root', 'Arity (out)', 'Of', 'Entry type', 'Fill from', 'Owner'],
             array_map(static fn (array $r): array => [
                 $r['root'] === '' ? '(root)' : $r['root'],
-                $r['arity'],
+                implode(' › ', $r['arity']),
                 $r['of'],
                 $r['entryType'],
                 $r['sources'] === [] ? 'hand' : implode("\n", $r['sources']),
@@ -106,7 +106,12 @@ class RegistriesCommand extends Command
      * The declaration is read off the OWNER where there is one — under the sanctioned composition pattern
      * the store is a `BasicRegistry` and the attribute lives on the class that holds it (ticket 20 D6).
      *
-     * @return list<array{root: string, of: string, arity: string, entryType: string, onDuplicate: string, optionality: string, note: string|null, sources: list<string>, owner: string, order: int}>
+     * `arity` is a LIST of step values, outermost first, and stays a list even for the one-step case that
+     * is 77 of 79 registries — ticket 16 records this projection as the presumptive TS wire shape, and a
+     * field that is sometimes a string and sometimes an array is the worst possible thing to put on a
+     * wire (ticket 47). The table joins it; `--json` does not.
+     *
+     * @return list<array{root: string, of: string, arity: non-empty-list<string>, entryType: string, onDuplicate: string, optionality: string, note: string|null, sources: list<string>, owner: string, order: int}>
      */
     protected function rows(RegistryIndex $index): array
     {
@@ -125,7 +130,7 @@ class RegistriesCommand extends Command
             $rows[] = [
                 'root' => (string) $key,
                 'of' => $declaration->of,
-                'arity' => $declaration->arity->value,
+                'arity' => array_map(static fn (RegistryArity $a): string => $a->value, $declaration->arity),
                 'entryType' => $declaration->entryType,
                 'onDuplicate' => $declaration->onDuplicate->value,
                 'optionality' => $declaration->optionality->value,
@@ -184,22 +189,31 @@ class RegistriesCommand extends Command
      * The arity column is the point of this table — it is what makes "is this a registry or a manifest?"
      * legible (canon: `the-seam-is-a-registry`): both are one primitive, and arity is what actually differs.
      *
-     * @param  list<array{arity: string, ...}>  $rows
+     * De-duplicated per STEP, not per row: a two-step registry rendered `pick-one › compose-many` needs
+     * both lines, and the row it shares a step with must not suppress either. This is where a multi-level
+     * arity is turned into prose, and it is the renderer's job rather than the enum's —
+     * {@see RegistryArity::blurb()}'s bound is that a case carries prose about ITSELF and nothing else,
+     * so the join lives here (ticket 47). A second renderer of the same thing is when a shared helper
+     * earns its place; one does not.
+     *
+     * @param  list<array{arity: non-empty-list<string>, ...}>  $rows
      */
     protected function legend(array $rows): void
     {
-        $this->components->info('Resolving, by arity (how many entries a read engages):');
+        $this->components->info('Resolving, by arity (how many entries a read engages, outermost first):');
 
         $seen = [];
 
         foreach ($rows as $row) {
-            if (in_array($row['arity'], $seen, true)) {
-                continue;
-            }
+            foreach ($row['arity'] as $step) {
+                if (in_array($step, $seen, true)) {
+                    continue;
+                }
 
-            $seen[] = $row['arity'];
-            $arity = RegistryArity::from($row['arity']);
-            $this->line("  <comment>{$arity->value}</comment> — {$arity->blurb()}");
+                $seen[] = $step;
+                $arity = RegistryArity::from($step);
+                $this->line("  <comment>{$arity->value}</comment> — {$arity->blurb()}");
+            }
         }
     }
 }
