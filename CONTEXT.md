@@ -33,9 +33,20 @@ An Invocable answered over the network — `Binding::Mcp` or `Binding::Webhook`.
 The transport is an injected closure, so the kernel depends on no HTTP or MCP
 client.
 
-**Strategy** / **StrategyLadder**:
+**Rung** / **Ladder**:
 An ordered set of attempts at a capability, each self-validating; the ladder
-walks them until one produces an acceptable `StrategyResult`.
+`climb()`s them until one produces an acceptable `RungResult`.
+_Avoid_: Strategy, StrategyLadder (the pre-rename spelling, registry-kernel
+ticket 33), and **Resolver** — an estate `Resolver` is an *entry*, a single
+implementation turning a context into one value, not a socket-reader. 128
+non-vendor classes use it that way.
+
+**Laddered**:
+A `Registry` whose own `resolve()` is an ordered climb over declared tiers, and
+which says so — `rungs()` returns the tier names, outermost first. Purely
+declarative: the kernel never climbs for you, because the registries that
+declare it hold *different* policies and an executive climb would model one and
+silently break another (registry-kernel tickets 33, 36).
 
 ## Example
 
