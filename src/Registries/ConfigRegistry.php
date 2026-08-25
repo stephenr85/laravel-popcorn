@@ -14,6 +14,7 @@ use Rushing\Popcorn\Registries\Nested;
 use Rushing\Popcorn\Registries\Registrar;
 use Rushing\Popcorn\Registries\Registry;
 use Rushing\Popcorn\Registries\RegistryKey;
+use Rushing\Popcorn\Registries\RegistryNode;
 
 /**
  * A registry whose STORAGE is a host config array — the adapter for the estate's objectless registries.
@@ -187,6 +188,11 @@ abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
     public function descendants(RegistryKey|string $key): array
     {
         return $this->store()->descendants($key);
+    }
+
+    public function nodeAt(RegistryKey|string $key): RegistryNode
+    {
+        return $this->store()->nodeAt($key);
     }
 
     public function unfiltered(): Registry
