@@ -4,10 +4,12 @@ namespace Rushing\Popcorn\Laravel\Console;
 
 use Illuminate\Console\Command;
 use Rushing\Popcorn\Laravel\PopcornManager;
-use Rushing\Popcorn\Registries\BasicRegistry;
+use Rushing\Popcorn\Registries\CarriesDeclaration;
 use Rushing\Popcorn\Registries\Exceptions\InvalidRegistryKey;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
+use Rushing\Popcorn\Registries\RecordsRegistrants;
+use Rushing\Popcorn\Registries\RecordsSupersession;
 use Rushing\Popcorn\Registries\Registry;
 use Rushing\Popcorn\Registries\RegistryKey;
 
@@ -23,10 +25,15 @@ use Rushing\Popcorn\Registries\RegistryKey;
  *
  * Artisan-only tooling is ticket 09 D11's sanctioned case for the explicit escape, and a catalogue that
  * silently omitted what the running actor cannot see would be a catalogue you cannot trust to be
- * complete. Note the DOUBLE call: `RegistryIndex::unfiltered()` unfilters which registries you can see,
- * and hands back the same live singletons still carrying the pushed authorizer, so a second
- * `unfiltered()` on the registry itself is what unfilters its ENTRIES (ticket 17 D6). Routing already
- * reads the index structurally, so the one that matters here is the registry's own.
+ * complete. Routing already reads the index structurally, so the call that matters here is the routed
+ * registry's own `unfiltered()`.
+ *
+ * ⚠️ **The double call this docblock used to prescribe is gone (ticket 45).**
+ * `RegistryIndex::unfiltered()` escaped one level — it unfiltered which registries you could see and
+ * handed back the same live singletons still carrying the pushed authorizer — so callers had to
+ * `unfiltered()` again on each registry. It is deep now. This command never depended on that (it routes
+ * first, then unfilters the store), which is why it was already correct; a caller that went through
+ * `$index->unfiltered()->resolve(...)` was not.
  *
  * ## The suggester is filtered, and that asymmetry is deliberate
  *
@@ -36,17 +43,31 @@ use Rushing\Popcorn\Registries\RegistryKey;
  * only when a host has installed an authorizer that denies the console actor — where the honest
  * behaviour is the one that leaks less.
  *
- * ## No registrant column, yet
+ * ## The registrant column, finally
  *
- * 13 D10 chartered this as "keys with their registrants" and the contract cannot answer the second
- * half: `by` is written on every entry by `register()` and none of `Registry`'s seven methods reads it
- * back (ticket 29 D2). It is readable only for a DISPLACED entry, through
- * {@see \Rushing\Popcorn\Registries\RecordsSupersession}. Adding a provenance read is ticket 48's, and
- * this command is its second waiting consumer.
+ * 13 D10 chartered this as *"lists one registry's live keys **with their registrants**"* and ticket 32
+ * could not ship the second half: `by` was written on every entry by `register()` and read back by none
+ * of `Registry`'s seven methods (ticket 29 D2), reachable only for a DISPLACED entry through
+ * `RecordsSupersession`. **Ticket 48 landed {@see RecordsRegistrants}** and the column is here.
+ *
+ * Two properties of the rendering, both deliberate:
+ *
+ * - **`null` is the majority case and prints as `—`, not as a blank.** 29 D2 measured 13 of 38 entries
+ *   carrying `$by` at all, and of the registrants that exist, 8 of 10 name the registering registry's
+ *   own class. A blank would read as "the column is broken"; a dash reads as "nobody said."
+ * - **The bare one-key-per-line output survives when no entry names a registrant**, so a pipe into
+ *   `grep`/`xargs` keeps working on the majority of roots. The table appears only when there is
+ *   something to put in it.
+ *
+ * The JSON gains `registrants` as a `key => by` map beside the existing `keys` list rather than
+ * reshaping `keys` into objects — an additive key cannot break a reader that already parses this.
  */
 class KeysCommand extends Command
 {
-    protected $signature = 'popcorn:keys {prefix : A registry root, or any key prefix under one} {--json : Emit the keys as JSON}';
+    protected $signature = 'popcorn:keys
+        {prefix : A registry root, or any key prefix under one}
+        {--supersessions : List what was OVERWRITTEN under the prefix instead of what is live}
+        {--json : Emit the keys as JSON}';
 
     protected $description = "One registry's live keys at or under a prefix — the entry-level read popcorn:registries does not do.";
 
@@ -76,9 +97,15 @@ class KeysCommand extends Command
 
         $keys = $this->keysUnder($registry, $prefix);
 
+        if ($this->option('supersessions')) {
+            return $this->reportSupersessions($registry, $prefix, $keys);
+        }
+
+        $registrants = $this->registrantsFor($registry, $keys);
+
         if ($this->option('json')) {
             $this->line((string) json_encode(
-                ['prefix' => (string) $prefix, 'keys' => $keys],
+                ['prefix' => (string) $prefix, 'keys' => $keys, 'registrants' => $registrants],
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
             ));
 
@@ -92,11 +119,144 @@ class KeysCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($keys as $key) {
-            $this->line($key);
+        // The table only appears when there is something to put in it — see the class docblock. A root
+        // where nobody named a registrant keeps the pipe-friendly one-key-per-line output it had.
+        if (array_filter($registrants) === []) {
+            foreach ($keys as $key) {
+                $this->line($key);
+            }
+
+            return self::SUCCESS;
         }
 
+        $this->table(
+            ['Key', 'Registered by'],
+            array_map(fn (string $key): array => [$key, $registrants[$key] ?? '—'], $keys),
+        );
+
         return self::SUCCESS;
+    }
+
+    /**
+     * `--supersessions` — what was OVERWRITTEN under the prefix, oldest first.
+     *
+     * **This is the reader registry-kernel ticket 48 was opened to find, and it is on the CLI channel
+     * rather than the doctor channel — deliberately.**
+     *
+     * The estate's instinct for "something must read this" is a doctor audit, and 48's question 1
+     * reached for one. It cannot be built yet, and the reason is not effort: **a check needs a
+     * discriminator, and `$by`'s content is a tautology today.** 29 D2 measured the live population — 38
+     * entries, 13 carrying `$by`, and of 10 distinct registrants **8 are the registering registry's own
+     * class**. 48's proposed discriminator is *"did a registrar displace a hand registration, or the
+     * reverse"*, which needs `$by` to name a package or a provider. Nothing does. A gate over that field
+     * today would row every supersession, and 19 D1's whole point is that the DESIGNED case — a
+     * consumer's `register()` displacing a registrar's seed — is most of them. Noise in a gate is how a
+     * gate stops being read.
+     *
+     * So: **report now, gate when tickets 37/38 have set a registrant vocabulary that names a package or
+     * a provider.** A report is honest about being a report; a green gate over a tautology is not.
+     *
+     * ## What this cannot see, said here rather than implied by a clean run
+     *
+     * A registry that does not implement {@see RecordsSupersession} has no history and answers nothing —
+     * `Reject` and `Admit` registries legitimately (nothing is ever displaced under either), and
+     * {@see \Rushing\Popcorn\Registries\ConfigRegistry} deliberately, because its store is a config
+     * array it does not own.
+     *
+     * **`ConfigRegistry`'s hole is bigger than its own absence, and it is worth knowing.** The estate's
+     * config-fed registrants bypass `register()` entirely — `laravel-data-filters` and `laravel-frame`
+     * read the config array, append under an `in_array` guard, and write it back — so `OnDuplicate` never
+     * runs on that path at all and the record dies with the projection. Today that is safe: the map shape
+     * cannot represent a duplicate, and the list shape collides only when two registrants register the
+     * same class, which the guard already makes a no-op. **The first registrant that writes through
+     * `register()` instead of appending gets an unrecorded overwrite** (19 D5). An empty result here is
+     * not evidence of no overwrite on those roots.
+     *
+     * @param  Registry<mixed>  $registry
+     * @param  list<string>  $keys
+     */
+    protected function reportSupersessions(Registry $registry, Key $prefix, array $keys): int
+    {
+        $store = $registry->unfiltered();
+
+        if (! $store instanceof RecordsSupersession) {
+            $this->components->warn(
+                "`{$prefix}` is held by a registry that records no supersession history, so there is "
+                    .'nothing to report — not "nothing was overwritten". Reject and Admit registries never '
+                    .'displace anything; ConfigRegistry refuses the record because it does not own its store.'
+            );
+
+            return self::SUCCESS;
+        }
+
+        $rows = [];
+
+        foreach ($keys as $key) {
+            foreach ($store->superseded($key) as $displaced) {
+                $rows[] = [$key, $displaced->by ?? '—', (string) $displaced->sequence];
+            }
+        }
+
+        if ($this->option('json')) {
+            $this->line((string) json_encode(
+                [
+                    'prefix' => (string) $prefix,
+                    'supersessions' => array_map(
+                        fn (array $row): array => ['key' => $row[0], 'by' => $row[1] === '—' ? null : $row[1], 'sequence' => (int) $row[2]],
+                        $rows,
+                    ),
+                ],
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
+            ));
+
+            return self::SUCCESS;
+        }
+
+        if ($rows === []) {
+            $this->components->info("Nothing under `{$prefix}` has been overwritten.");
+
+            return self::SUCCESS;
+        }
+
+        $this->table(['Key', 'Displaced entry registered by', 'Sequence'], $rows);
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Who registered each of `$keys`, as a `key => by` map — the read ticket 13 D10 chartered and ticket
+     * 32 could not ship.
+     *
+     * Returns an empty map for a registry that does not implement {@see RecordsRegistrants}. That is not
+     * a degradation to apologise for: `ConfigRegistry` deliberately does not implement it, because its
+     * store is a config array it does not own and keeping a shadow ledger beside it is the
+     * reaching-past-the-boundary ticket 08 D11 refuses. The type says so, and this reads the type rather
+     * than guessing.
+     *
+     * Reads through `unfiltered()` for the same reason {@see keysUnder()} does — the keys were listed
+     * unfiltered, so a filtered registrant read would print `—` for an entry that has one.
+     *
+     * @param  Registry<mixed>  $registry
+     * @param  list<string>  $keys
+     * @return array<string, string|null>
+     */
+    protected function registrantsFor(Registry $registry, array $keys): array
+    {
+        $store = $registry->unfiltered();
+
+        if (! $store instanceof RecordsRegistrants) {
+            return [];
+        }
+
+        $registrants = [];
+
+        foreach ($store->keys() as $key) {
+            if (in_array((string) $key, $keys, true)) {
+                $registrants[(string) $key] = $store->registrantOf($key);
+            }
+        }
+
+        return $registrants;
     }
 
     /**
@@ -141,7 +301,11 @@ class KeysCommand extends Command
     /** @param  Registry<mixed>  $registry */
     protected function ownsRootExactly(Registry $registry, Key $prefix): bool
     {
-        $declaration = $registry instanceof BasicRegistry
+        // {@see CarriesDeclaration} rather than `instanceof BasicRegistry`, which is what this read
+        // used to test — the same defect registry-kernel 59 B1 fixed in `RegistryIndex::declarationOf()`,
+        // one tier up. An archetype-f registry holds no `BasicRegistry` and declares inline, so the type
+        // test would have sent it to a class attribute it deliberately does not carry.
+        $declaration = $registry instanceof CarriesDeclaration
             ? $registry->declaration()
             : IsRegistry::of($registry);
 
