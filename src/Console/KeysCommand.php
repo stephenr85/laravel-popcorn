@@ -52,8 +52,13 @@ class KeysCommand extends Command
 
     public function handle(PopcornManager $popcorn): int
     {
+        $argument = $this->argument('prefix');
+
         try {
-            $prefix = Key::parse($this->argument('prefix'));
+            // `argument()` is typed `array|bool|string|null` for the whole console surface; THIS
+            // signature declares `{prefix}` as a required single value, so the only reachable case is
+            // string. Asked rather than cast, because a cast of the array case is a fatal.
+            $prefix = Key::parse(is_string($argument) ? $argument : '');
         } catch (InvalidRegistryKey $illegal) {
             $this->components->error($illegal->getMessage());
 
@@ -104,6 +109,7 @@ class KeysCommand extends Command
      * when the prefix names the registry's own root, and only then, because a foreign-keyed registry is
      * one flat keyspace of its owner's devising with no sub-prefix to speak of (ticket 20 D3).
      *
+     * @param  Registry<mixed>  $registry
      * @return list<string>
      */
     protected function keysUnder(Registry $registry, Key $prefix): array
@@ -132,6 +138,7 @@ class KeysCommand extends Command
      * routes here" and this needs "which root did this registry declare", which are the same fact by
      * two routes and only one of them is a walk.
      */
+    /** @param  Registry<mixed>  $registry */
     protected function ownsRootExactly(Registry $registry, Key $prefix): bool
     {
         $declaration = $registry instanceof BasicRegistry

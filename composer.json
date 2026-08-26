@@ -19,7 +19,8 @@
     "require-dev": {
         "laravel/pint": "^1.0",
         "orchestra/testbench": "^9.0",
-        "pestphp/pest": "^3.0"
+        "pestphp/pest": "^3.0",
+        "phpstan/phpstan": "^2.2"
     },
     "autoload": {
         "psr-4": {
@@ -54,6 +55,7 @@
     "prefer-stable": true,
     "scripts": {
         "pint": "@php -d memory_limit=512M vendor/bin/pint",
+        "analyse": "phpstan analyse",
         "test": "@php vendor/bin/pest"
     }
 }

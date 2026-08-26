@@ -1,0 +1,20 @@
+parameters:
+    paths:
+        - src/
+
+    # Level 8, and PLAIN phpstan rather than larastan — matching `rushing/php-popcorn`, the half of the
+    # kernel this package wraps. The estate's six analysing hosts run larastan 3.9 at level 7, so this
+    # is deliberately not the house shape, and the reason is measured rather than argued
+    # (registry-kernel ticket 50, 2026-08-26). The same `src/` was analysed four ways:
+    #
+    #     plain phpstan  level 7 → 10 errors      larastan 3.9  level 7 → 10 errors
+    #     plain phpstan  level 8 → 10 errors      larastan 3.9  level 8 → 10 errors
+    #
+    # The SAME ten in all four. The extension contributes nothing on this surface — 11 files, no
+    # Eloquent model, no query builder, no migration, so there is no Laravel modelling for larastan to
+    # do — and it would have cost a dependency plus a second toolchain for the kernel's two halves.
+    # Level 8 costs nothing here and keeps both halves on one config at one level.
+    #
+    # NO BASELINE. All ten were fixed rather than recorded, so this package's ratchet is the absence of
+    # the file: the next error to appear is the next error someone sees.
+    level: 8

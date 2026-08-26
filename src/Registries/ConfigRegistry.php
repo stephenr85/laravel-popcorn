@@ -71,6 +71,10 @@ use Rushing\Popcorn\Registries\RegistryNode;
  * array literally contains.
  *
  * @see keyFor() for the one thing a subclass may need to supply.
+ *
+ * @template TEntry
+ *
+ * @implements Registry<TEntry>
  */
 abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
 {
@@ -236,6 +240,7 @@ abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
      * Built per call on purpose — see the class docblock. Registration order is the config array's own
      * order, which is what a `RunAll` pipeline like `data-schemas.strategies` means by it.
      */
+    /** @return BasicRegistry<TEntry> */
     protected function store(): BasicRegistry
     {
         $store = new BasicRegistry($this->declaration(), $this->authorizer);
@@ -302,7 +307,11 @@ abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
      * from the entry gets replace-in-place — and the ordered pipeline keeps its position — instead of a
      * duplicate appended at the end.
      *
-     * @param  array<int|string, mixed>  $entries
+     * Takes a LIST, not an array: the one caller reaches this only inside `array_is_list($entries)`,
+     * so the index it hands back is an int by construction. Declared `array<int|string, mixed>` it was
+     * a `?int` return that could hand back a string — found by the level-8 run, 2026-08-26.
+     *
+     * @param  list<mixed>  $entries
      */
     private function indexOfSlot(array $entries, string $slot): ?int
     {

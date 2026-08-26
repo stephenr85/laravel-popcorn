@@ -101,6 +101,7 @@ class PopcornManager
      * The registry that OWNS `$key` by longest-prefix routing — the storage a read is handed to, which
      * is a different question from {@see registry()}'s "what is described at this exact root".
      */
+    /** @return Registry<mixed>|null */
     public function routeTo(RegistryKey|string $key): ?Registry
     {
         return $this->index->routeTo($key);
@@ -147,7 +148,10 @@ class PopcornManager
                     // The index is itself an entry of the index (it self-hosts), and its keys are
                     // ROOTS rather than entry keys — including the empty one. Suggesting those in
                     // answer to a missed entry key would be a category error.
-                    fn (mixed $entry): bool => $entry instanceof Registry && $entry !== $this->index,
+                    //
+                    // No `instanceof Registry` half: the index is declared `Registry<Registry<mixed>>`,
+                    // so the type system now proves what that used to assert at runtime.
+                    fn (Registry $entry): bool => $entry !== $this->index,
                 )),
             ))
             : $owner->keys();
