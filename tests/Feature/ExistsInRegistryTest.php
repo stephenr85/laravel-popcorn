@@ -3,10 +3,12 @@
 use Illuminate\Support\Facades\Validator;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
 use Rushing\Popcorn\Laravel\Rules\ExistsInRegistry;
+use Rushing\Popcorn\Registries\AbsoluteUriKey;
 use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
+use Rushing\Popcorn\Registries\RelativeUriKey;
 use Rushing\Popcorn\Tests\Fixtures\NamespaceUriKey;
 
 /**
@@ -114,11 +116,12 @@ it('raises a developer error rather than failing the user when nothing claims th
         ->toThrow(InvalidArgumentException::class, 'No registry claims `nothing.claims.this`');
 });
 
-it('raises a developer error rather than failing the user on a foreign-keyed registry', function () {
+it('raises a developer error rather than failing the user on an unaddressable registry', function () {
     // Ticket 11's standing rule: a green suite against `Key` proves nothing about the seam, because
-    // `Key` is the one implementation that round-trips. A foreign key is never stamped with a root
-    // (20 D3), so a prefix cannot name its entries and comparing renderings would compare the wrong
-    // thing — a validation failure here would blame the user for the developer's mistake (13 D4).
+    // `Key` is the one implementation that round-trips. A key the kernel cannot address is never
+    // stamped with a root (20 D3, narrowed by 64), so a prefix cannot name its entries and comparing
+    // renderings would compare the wrong thing — a validation failure here would blame the user for
+    // the developer's mistake (13 D4).
     $store = new BasicRegistry(new IsRegistry(
         root: 'jsonns.namespaces',
         of: 'namespaces by URI',
@@ -128,12 +131,40 @@ it('raises a developer error rather than failing the user on a foreign-keyed reg
     app(RegistryIndex::class)->describe($store);
 
     expect(fn () => failureFor('jsonns.namespaces.grounding', 'jsonns.namespaces'))
-        ->toThrow(InvalidArgumentException::class, 'foreign RegistryKey');
+        ->toThrow(InvalidArgumentException::class, 'which the kernel cannot address');
 });
 
-it('refuses a foreign key as the prefix itself, at construction', function () {
+it('refuses an unaddressable key as the prefix itself, at construction', function () {
     expect(fn () => new ExistsInRegistry(NamespaceUriKey::of('https://schemastud.dev/ns/grounding/2')))
-        ->toThrow(InvalidArgumentException::class, 'foreign registry key');
+        ->toThrow(InvalidArgumentException::class, 'whose keys the kernel cannot address');
+});
+
+it('refuses an AbsoluteUriKey prefix too, because kernel-owned is not the test', function () {
+    // The trap in the narrowing: "the kernel ships it" is NOT the criterion. AbsoluteUriKey is the
+    // kernel's own and still declines root-stamping, so its entries have no address for a prefix to
+    // name — exactly as a consumer's own key type does. What the rule asks is whether the key comes
+    // back addressable, not who wrote the class (ticket 64).
+    expect(fn () => new ExistsInRegistry(AbsoluteUriKey::of('https://app.splicewire.com/json-schemas/grounding')))
+        ->toThrow(InvalidArgumentException::class, 'whose keys the kernel cannot address');
+});
+
+it('ACCEPTS a slash-spelled prefix and the registry behind it, which is what 64 changed', function () {
+    // The behavioural half of the narrowing, and the reason it needs a test rather than a docblock:
+    // a RelativeUriKey is neither foreign nor canonical. It parses to a dotted address at the door,
+    // so both the old `instanceof Key` gates — the prefix check and the keys() scan in assertUsable()
+    // — used to refuse a registry that is fully addressable. Nothing about the failure was visible
+    // from the owning package's own suite.
+    $store = new BasicRegistry(new IsRegistry(
+        root: 'nav.kinds',
+        of: 'nav kinds',
+        arity: RegistryArity::PickOne,
+    ));
+    $store->register(RelativeUriKey::of('nav/link'), 'the link kind', by: 'tests');
+    app(RegistryIndex::class)->describe($store);
+
+    expect(new ExistsInRegistry(RelativeUriKey::of('nav/kinds')))->toBeInstanceOf(ExistsInRegistry::class)
+        ->and(failureFor('nav.kinds.nav.link', 'nav.kinds'))->toBeNull()
+        ->and(failureFor('nav.kinds.nav.absent', 'nav.kinds'))->not->toBeNull();
 });
 
 it('accepts no glob, because there is no second form', function () {

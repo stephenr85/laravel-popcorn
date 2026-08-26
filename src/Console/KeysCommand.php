@@ -265,9 +265,17 @@ class KeysCommand extends Command
      * Segment-wise via {@see Key::isUnder()}, the same comparison the read path makes, so `beam.realms`
      * does not appear under `beam.realm`.
      *
-     * A foreign {@see RegistryKey} is never stamped with a root and so is under nothing — it is listed
-     * when the prefix names the registry's own root, and only then, because a foreign-keyed registry is
-     * one flat keyspace of its owner's devising with no sub-prefix to speak of (ticket 20 D3).
+     * A {@see RegistryKey} the kernel cannot address is never stamped with a root and so is under
+     * nothing — it is listed when the prefix names the registry's own root, and only then, because such
+     * a registry is one flat keyspace of its owner's devising with no sub-prefix to speak of
+     * (ticket 20 D3, narrowed by ticket 64).
+     *
+     * The `instanceof Key` below is therefore asking the right question by accident of the door rather
+     * than by luck: a {@see \Rushing\Popcorn\Registries\RelativeUriKey} parses to a `Key` before it is
+     * ever stored, so a slash-spelled registry reaches this loop already addressable and enumerates
+     * under its sub-prefixes like any other. What still lands in the `$atRoot` branch is what genuinely
+     * has no address — a consumer's own key type, and the kernel's own
+     * {@see \Rushing\Popcorn\Registries\AbsoluteUriKey}, which declines stamping deliberately.
      *
      * @param  Registry<mixed>  $registry
      * @return list<string>
@@ -291,8 +299,8 @@ class KeysCommand extends Command
     }
 
     /**
-     * Whether `$prefix` is the routed registry's own declared root — the only prefix a foreign-keyed
-     * registry can be addressed by.
+     * Whether `$prefix` is the routed registry's own declared root — the only prefix an unaddressably
+     * keyed registry can be named by.
      *
      * Asked of the store rather than derived from the index, because the index answers "which root
      * routes here" and this needs "which root did this registry declare", which are the same fact by

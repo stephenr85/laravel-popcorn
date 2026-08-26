@@ -9,6 +9,7 @@ use Rushing\Popcorn\Laravel\PopcornManager;
 use Rushing\Popcorn\Registries\Key;
 use Rushing\Popcorn\Registries\Registry;
 use Rushing\Popcorn\Registries\RegistryKey;
+use Rushing\Popcorn\Registries\Rootable;
 
 /**
  * `'realm' => ['required', new ExistsInRegistry('beam.realm')]` — the submitted value must be a live,
@@ -52,10 +53,21 @@ use Rushing\Popcorn\Registries\RegistryKey;
  *
  * A validation failure blames the person filling in the form. These are not their fault, so they throw:
  *
- * - **A foreign-keyed prefix or registry** (13 D4). `(string) $key` does not round-trip for a consumer's
- *   own {@see RegistryKey}, so string comparison there compares renderings — and per ticket 20 D3 a
- *   foreign key is never stamped, which puts such a registry's entries outside the global keyspace
- *   entirely. The rule refusing them agrees with the kernel rather than adding a restriction.
+ * - **A prefix or registry whose key type the kernel cannot address** (13 D4, narrowed by ticket 64).
+ *   `(string) $key` does not round-trip for a consumer's own {@see RegistryKey}, so string comparison
+ *   there compares renderings — and such a key is never root-stamped, which puts the registry's entries
+ *   outside the global keyspace entirely. The rule refusing them agrees with the kernel rather than
+ *   adding a restriction.
+ *
+ *   ⚠️ **This is narrower than it was, and the narrowing is behavioural.** It used to read *foreign-keyed*
+ *   and be implemented as `instanceof Key`, which is the same conflation ticket 58 D3 found in
+ *   `BasicRegistry::door()`: **canonical** standing in for **addressable**. A
+ *   {@see \Rushing\Popcorn\Registries\RelativeUriKey} is neither foreign nor canonical — it is the
+ *   kernel's own parser for slash-spelled references, and it hands the door a `Key`. Such a registry is
+ *   now accepted, because after its door there is nothing non-dotted left to compare. What is still
+ *   refused is what genuinely has no address: a consumer's own key type, and
+ *   {@see \Rushing\Popcorn\Registries\AbsoluteUriKey}, which is kernel-owned and declines stamping
+ *   openly.
  * - **Nothing claims the prefix at all.** {@see \Rushing\Popcorn\Registries\Exceptions\UnregisteredRegistry}
  *   is a SIBLING of `RegistryMiss`, not a subclass (20's input to this ticket), so the two paths are
  *   genuinely separate: a key naming no registry means the rule points at a registry that never
@@ -69,14 +81,24 @@ class ExistsInRegistry implements ValidationRule
     public function __construct(RegistryKey|string $prefix)
     {
         $coerced = Key::of($prefix);
+        $original = $coerced;
+
+        // Asking the key to root itself at the root of the WHOLE tree is how "can the kernel address
+        // this?" gets asked without a class list: a Rootable that is really a parser over the dotted
+        // keyspace answers with the Key it parses to, and one that declines answers with itself. A
+        // zero-segment root makes the call a no-op for anything already addressable, so this coerces
+        // without ever relocating a key (ticket 64).
+        if ($coerced instanceof Rootable) {
+            $coerced = $coerced->underRoot(Key::root());
+        }
 
         if (! $coerced instanceof Key) {
             throw new InvalidArgumentException(sprintf(
-                'ExistsInRegistry was pointed at a foreign registry key (`%s`, a %s). A foreign key is '
-                    .'never stamped with a root, so its registry has no address in the global keyspace '
-                    .'for a prefix to name. Reach that registry through the index instead.',
-                $coerced,
-                $coerced::class,
+                'ExistsInRegistry was pointed at `%s`, a %s, whose keys the kernel cannot address. Such '
+                    .'a key is never stamped with a root, so its registry has no address in the global '
+                    .'keyspace for a prefix to name. Reach that registry through the index instead.',
+                $original,
+                $original::class,
             ));
         }
 
@@ -139,9 +161,9 @@ class ExistsInRegistry implements ValidationRule
             }
 
             throw new InvalidArgumentException(sprintf(
-                'The registry claiming `%s` is keyed by %s, a foreign RegistryKey. Its entries are '
-                    .'outside the global keyspace — never stamped with a root, and `(string) $key` does '
-                    .'not round-trip — so a prefix cannot name them and comparing renderings would '
+                'The registry claiming `%s` is keyed by %s, which the kernel cannot address. Its entries '
+                    .'are outside the global keyspace — never stamped with a root, and `(string) $key` '
+                    .'does not round-trip — so a prefix cannot name them and comparing renderings would '
                     .'silently compare the wrong thing. Validate it through its own owner instead.',
                 $this->prefix,
                 $key::class,
