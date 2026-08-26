@@ -197,6 +197,28 @@ class PopcornManager
     }
 
     /**
+     * Every loadable class-string under `$paths` — the same finder as {@see discover()} with no
+     * keep/drop test applied at all.
+     *
+     * The door exists because not every discoverer filters by attribute. `schemastud/laravel-data-schemas`
+     * keeps `isSubclassOf(Spatie\LaravelData\Data::class)` plus an fnmatch on namespaces, and having no
+     * attribute-free door is precisely why it had hand-rolled its own `class\s+(\w+)` regex — which
+     * matched the word "class" in a docblock and silently skipped twelve real `Data` classes across the
+     * estate. Ticket 07 D10 says nothing else should `new` {@see AttributedClassScanner}; the honest way
+     * to hold that line is for the front door to answer the question the caller actually has.
+     *
+     * Enumeration only — a caller filtering by interface, parent, or naming still writes its own test,
+     * which keeps this a FIND util rather than a second discovery vocabulary.
+     *
+     * @param  list<string>  $paths
+     * @return list<class-string>
+     */
+    public function classesIn(array $paths): array
+    {
+        return (new AttributedClassScanner)->classesIn($paths);
+    }
+
+    /**
      * A {@see ConfigRegistrar} over `config($key)` — the whole of the Laravel side of that registrar.
      *
      * The kernel class takes an already-read array and cannot call `config()` itself:

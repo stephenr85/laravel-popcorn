@@ -73,3 +73,15 @@ it('says hand for a registry nothing fills automatically', function () {
         ->expectsOutputToContain('hand')
         ->assertSuccessful();
 });
+
+it('enumerates every class under a path when the keep test is not an attribute', function () {
+    $found = Popcorn::classesIn([__DIR__.'/../Fixtures']);
+
+    // The un-annotated fixtures come back too — `classesIn()` answers "what is HERE" and leaves the
+    // filtering to the caller. That door exists because `schemastud/laravel-data-schemas` filters by
+    // `isSubclassOf(Data::class)`, and having only an attribute door is why it had hand-rolled the
+    // `class\s+(\w+)` regex that silently skipped twelve real Data classes.
+    expect($found)->toContain(Rushing\Popcorn\Tests\Fixtures\AnnotatedThing::class)
+        ->and($found)->toContain(Rushing\Popcorn\Tests\Fixtures\NamespaceUriKey::class)
+        ->and(app(RegistryIndex::class)->unfiltered()->keys())->toHaveCount(2);
+});
