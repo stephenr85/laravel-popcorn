@@ -123,6 +123,10 @@ class DeclaredRegistryScan
             }
         }
 
+        foreach ($this->rootPackageRoots() as $path) {
+            $found[$path] = true;
+        }
+
         foreach ($this->installedPackageRoots() as $path) {
             $found[$path] = true;
         }
@@ -131,35 +135,82 @@ class DeclaredRegistryScan
     }
 
     /**
-     * One source root per installed package, from composer's own manifest.
+     * The source of the package the process is RUNNING IN, which is not one of its own dependencies.
+     *
+     * ⚠️ Without this a package testbench cannot see the package under test. `base_path()` inside
+     * testbench points at `vendor/orchestra/testbench-core/laravel`, and
+     * {@see installedPackageRoots()} reads `installed.json`, which lists a root package's
+     * DEPENDENCIES and never the root itself. So `laravel-pipeline-registry`'s own suite scanned its
+     * dependencies, found no `pipelines` root, and its *"it is described into the shared
+     * RegistryIndex"* test failed against a bake that had looked everywhere except at it.
+     *
+     * Measured 2026-08-31 across the estate: this one addition is what makes registry-kernel 73 D6's
+     * automatic testbench bake reach the ~29 package harnesses, with **no per-repo list** — which is
+     * the property that distinguishes it from the trait D5 proposed and D6 rejected.
+     *
+     * At a HOST the root package is the application, whose `app/` is already covered above, so this is
+     * additive and costs a deduplicated path.
+     *
+     * @return list<string>
+     */
+    protected function rootPackageRoots(): array
+    {
+        if (! class_exists(\Composer\InstalledVersions::class)) {
+            return [];
+        }
+
+        $root = \Composer\InstalledVersions::getRootPackage()['install_path'];
+        $found = [];
+
+        foreach (['src', 'app'] as $dir) {
+            if (is_dir($path = rtrim($root, '/').'/'.$dir) && ($real = realpath($path)) !== false) {
+                $found[$real] = true;
+            }
+        }
+
+        return array_keys($found);
+    }
+
+    /**
+     * One source root per installed family package, from Composer's own runtime API.
      *
      * `<pkg>/src` is preferred over `<pkg>`, and a package root is never descended into whole, for the
      * reason beam's `HostScanRoots` gives: every family package carries its own dev `vendor/` tree, so
      * descending re-scans the estate once per package.
      *
+     * ⚠️ Resolved through {@see \Composer\InstalledVersions} rather than by reading
+     * `base_path('vendor/composer/installed.json')`, and that is not a refactor — the path version is
+     * WRONG inside a testbench. `base_path()` there points at
+     * `vendor/orchestra/testbench-core/laravel`, which has no `vendor/` of its own, so the manifest was
+     * never found and this method returned an empty list. Measured 2026-08-31 in
+     * `rushing/laravel-codegen`: `rushing/codegen` is a perfectly ordinary installed dependency and the
+     * scan could not see it, so `codegen.generators` was missing from the index and the package's own
+     * *"describes the generator registry down into the index"* test failed against a bake that had
+     * looked in the wrong tree. `InstalledVersions` answers from the autoloader, so it is correct in a
+     * host and a testbench alike.
+     *
      * @return list<string>
      */
     protected function installedPackageRoots(): array
     {
-        $manifest = $this->app->basePath('vendor/composer/installed.json');
-
-        if (! is_file($manifest)) {
+        if (! class_exists(\Composer\InstalledVersions::class)) {
             return [];
         }
 
-        $decoded = json_decode((string) file_get_contents($manifest), true);
-        $packages = $decoded['packages'] ?? $decoded ?? [];
         $vendors = (array) config('popcorn.bake.vendors', ['rushing', 'schemastud', 'splicewire']);
         $found = [];
 
-        foreach (is_array($packages) ? $packages : [] as $package) {
-            $name = $package['name'] ?? null;
-
-            if (! is_string($name) || ! in_array(explode('/', $name)[0], $vendors, true)) {
+        foreach (\Composer\InstalledVersions::getInstalledPackages() as $name) {
+            if (! in_array(explode('/', $name)[0], $vendors, true)) {
                 continue;
             }
 
-            $base = $this->app->basePath('vendor/'.$name);
+            $base = \Composer\InstalledVersions::getInstallPath($name);
+
+            if ($base === null) {
+                continue;
+            }
+
             $src = is_dir($base.'/src') ? $base.'/src' : $base;
 
             if (is_dir($src) && ($real = realpath($src)) !== false) {

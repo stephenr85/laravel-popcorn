@@ -94,14 +94,6 @@ class PopcornServiceProvider extends ServiceProvider
             AliasLoader::getInstance()->alias('Popcorn', Popcorn::class);
         }
 
-        // Popcorn owns exactly one registry of its own, so it describes it down into the index from its
-        // own provider like any other owner — the direction rule ManifestIndex established and this
-        // index inherits. It is also the first estate registry to reach the index at all: until the
-        // migration lands, `popcorn:registries` lists the self-hosting index and this.
-        $this->app->make(RegistryIndex::class)->describe(
-            $this->app->make(InvocableRegistry::class),
-        );
-
         if ($this->app->runningInConsole()) {
             // The index of indexes. Relocated here from `splicewire/laravel-beam`'s
             // `splicewire:beam:manifests` with the index it renders (registry-kernel ticket 21) — full
