@@ -59,6 +59,20 @@ class RegistriesCommand extends Command
 
     public function handle(RegistryIndex $index): int
     {
+        // ⚠️ The catalogue is one of the three readers registry-kernel 73 D3.2 promised for the unbaked
+        // state, and it is the one an operator reaches for first. Without this it dies on a stack trace
+        // naming `unfiltered()` — technically loud, and useless: the reader whose whole job is "what is
+        // in the index" must be able to say "the list was never baked" in words.
+        if ($index->isUnbaked()) {
+            $this->components->error('The registry index has no baked membership list, so this command '
+                .'cannot answer. Run `'.\Rushing\Popcorn\Laravel\Baking\BakedRegistryManifest::COMMAND.'`.');
+            $this->line('  <comment>This is NOT the same as an estate with no registries.</comment> A host '
+                .'that genuinely declares none has an artifact listing nothing and reports an empty table; '
+                .'this host has no artifact at all, so nothing is described and nothing would be authorized.');
+
+            return self::FAILURE;
+        }
+
         if ($this->option('shadowing')) {
             return $this->shadowing($index);
         }
