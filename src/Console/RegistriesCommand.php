@@ -51,12 +51,18 @@ use Rushing\Popcorn\Registries\RegistryIndex;
  */
 class RegistriesCommand extends Command
 {
-    protected $signature = 'popcorn:registries {--json : Emit the index as JSON}';
+    protected $signature = 'popcorn:registries
+        {--json : Emit the index as JSON}
+        {--shadowing : List entries that went dark because two described roots overlap, instead of the index}';
 
     protected $description = 'The index of indexes: every registry in the estate, the root it owns, and how a read engages it.';
 
     public function handle(RegistryIndex $index): int
     {
+        if ($this->option('shadowing')) {
+            return $this->shadowing($index);
+        }
+
         $rows = $this->rows($index);
 
         if ($this->option('json')) {
@@ -96,6 +102,66 @@ class RegistriesCommand extends Command
                 $this->line("  <comment>{$row['root']}</comment> — {$row['note']}");
             }
         }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * `--shadowing` — the entries that went dark because two described roots overlap on them.
+     *
+     * The reader for what registry-kernel ticket 73 §1 turned from a `describe()` throw into a
+     * {@see \Rushing\Popcorn\Registries\Shadowed} record (php-popcorn ADR-0001). It lands on the CLI
+     * channel and not the doctor channel for the reason ticket 48 landed `popcorn:keys --supersessions`
+     * there: **this package installs no audits**, and the doctor-channel reader for the same condition
+     * already exists and already gates — `Splicewire\Beam\Doctor\RegistryConformanceAudit`'s
+     * `shadowed-entry` check, which reads the LIVE index post-boot and therefore sees a strict superset
+     * of these records. Writing a second gate here would be two checks answering one question in two
+     * packages, which is the failure 13 D10 named about this very command.
+     *
+     * What this adds that the audit cannot is **provenance**: who described the registry whose arrival
+     * created the overlap, and in what order. That is reconstructible from the record and from nothing
+     * else, because the index's post-boot state does not remember which of two roots arrived second.
+     *
+     * ⚠️ **An empty list is NOT a clean estate**, and the command says so out loud rather than printing a
+     * bare "none". The record can only see entries that already existed at the moment one of the two
+     * registries was described, and a registry is normally described before its registrars fill it. A
+     * reader that cannot distinguish "nothing there" from "could not look" is this estate's signature
+     * defect; the pointer at the audit is what distinguishes them here.
+     */
+    protected function shadowing(RegistryIndex $index): int
+    {
+        $records = $index->shadowed();
+
+        if ($records === []) {
+            $this->components->info('No shadowed entries were recorded at describe time.');
+            $this->line(
+                '  <comment>That is not the same as none existing.</comment> A registry is usually described '
+                    .'before its registrars fill it, so the entry that collides most often does not exist yet '
+                    .'when the index looks. The post-boot reader that sees the rest is '
+                    .'`splicewire:beam:doctor`\'s registry-conformance `shadowed-entry` check.'
+            );
+
+            return self::SUCCESS;
+        }
+
+        $this->table(
+            ['#', 'Entry that went dark', 'Held by (root)', 'Owned by (root)', 'Described by'],
+            array_map(static fn ($s): array => [
+                $s->sequence,
+                (string) $s->key,
+                (string) $s->shallower,
+                (string) $s->deeper,
+                $s->by ?? '—',
+            ], $records),
+        );
+
+        $this->newLine();
+        $this->components->warn(sprintf(
+            '%d entry/entries answer to two registries. A read through the index routes each to the DEEPER '
+                .'root and never sees it; a read straight off the shallower registry still answers with it. '
+                .'Move the entry, or move the root.',
+            count($records),
+        ));
 
         return self::SUCCESS;
     }
