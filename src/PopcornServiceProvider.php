@@ -7,11 +7,13 @@ use Illuminate\Support\ServiceProvider;
 use Rushing\Popcorn\InvocableRegistry;
 use Rushing\Popcorn\Laravel\Baking\BakedRegistryManifest;
 use Rushing\Popcorn\Laravel\Baking\DeclaredRegistryScan;
+use Rushing\Popcorn\Laravel\Baking\TestEnvironmentBake;
 use Rushing\Popcorn\Laravel\Console\CacheRegistriesCommand;
 use Rushing\Popcorn\Laravel\Console\ClearRegistriesCommand;
 use Rushing\Popcorn\Laravel\Console\KeysCommand;
 use Rushing\Popcorn\Laravel\Console\RegistriesCommand;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
+use Rushing\Popcorn\Registries\Exceptions\UnbakedRegistryIndex;
 use Rushing\Popcorn\Registries\RegistryIndex;
 
 class PopcornServiceProvider extends ServiceProvider
@@ -42,16 +44,28 @@ class PopcornServiceProvider extends ServiceProvider
 
             $baked = $app->make(BakedRegistryManifest::class)->read();
 
+            // ⚠️ ABSENT means two different things and treating them as one was the error D6 corrected.
+            //
+            //   absent in a BUILT HOST      -> a broken build. THROW, loudly, at the door (D3.2).
+            //   absent in an UNBUILT ENV    -> nothing has built anything yet. Supply it (D6).
+            //
+            // A testbench does not run a deploy pipeline, so an artifact it never had is not a failure
+            // — it is a missing fixture, exactly as un-migrated tables are for `RefreshDatabase`. This
+            // does NOT soften D3.2: the signal being hardened is "a deployed host that forgot to bake
+            // must not answer quietly", and the `else` below is untouched.
+            //
+            // It fires on ABSENT and never on DISAGREES. A present artifact wins in every environment,
+            // however stale — a wrong artifact at a built host is a conformance failure the audit owns,
+            // and papering over it here would hide the one thing the bake exists to make visible.
             if ($baked === null) {
-                // ABSENT is not EMPTY (73 D3.2). Nothing falls back to a live scan — that is the boot
-                // tax D2 refused, and a boot-time scan can die outright on an uncatchable
-                // E_COMPILE_ERROR. So the index is marked blind and every membership read raises,
-                // rather than every `routeTo()` quietly returning null with the Gated authorizer never
-                // installed on anything.
-                return $index->markUnbaked(\Rushing\Popcorn\Registries\Exceptions\UnbakedRegistryIndex::at(
-                    $app->make(BakedRegistryManifest::class)->path(),
-                    BakedRegistryManifest::COMMAND,
-                )->reason);
+                if (! $app->environment('testing')) {
+                    return $index->markUnbaked(UnbakedRegistryIndex::at(
+                        $app->make(BakedRegistryManifest::class)->path(),
+                        BakedRegistryManifest::COMMAND,
+                    )->reason);
+                }
+
+                $baked = $app->make(TestEnvironmentBake::class)->map();
             }
 
             foreach ($baked as $root => $entry) {
@@ -63,6 +77,7 @@ class PopcornServiceProvider extends ServiceProvider
 
         $this->app->singleton(BakedRegistryManifest::class, fn ($app) => new BakedRegistryManifest($app));
         $this->app->singleton(DeclaredRegistryScan::class, fn ($app) => new DeclaredRegistryScan($app));
+        $this->app->singleton(TestEnvironmentBake::class, fn ($app) => new TestEnvironmentBake($app));
 
         $this->app->scoped(PopcornManager::class, fn ($app) => new PopcornManager(
             $app->make(RegistryIndex::class),
