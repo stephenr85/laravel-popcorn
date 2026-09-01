@@ -2,7 +2,7 @@
     "name": "rushing/laravel-popcorn",
     "description": "A tiny kernel for transport-agnostic invocable capabilities and self-validating strategy ladders — local, MCP, or webhook bindings behind one named contract.",
     "keywords": ["laravel", "invocable", "strategy", "capability", "registry", "binding"],
-    "license": "proprietary",
+    "license": "MIT",
     "authors": [
         {
             "name": "Stephen Rushing",
