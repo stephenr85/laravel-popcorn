@@ -17,7 +17,7 @@ use Rushing\Popcorn\Registries\RegistryKey;
  * `php artisan popcorn:keys beam.realm` — one registry's live keys, one per line.
  *
  * The entry-level read {@see RegistriesCommand} deliberately does not do: that command lists REGISTRIES
- * (root, arity, what they are of) and carries no entries and no entry count, which is the split ticket
+ * (root, entry type, description) and carries no entries and no entry count, which is the split ticket
  * 13 D10 drew when it found there had never been a duplication to resolve. This is the other half —
  * "what is actually IN it", the question a miss message provokes.
  *

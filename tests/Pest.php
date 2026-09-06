@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Artisan;
 use Rushing\Popcorn\Registries\Authorizer;
 use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Rushing\Popcorn\Registries\RegistryKey;
 use Rushing\Popcorn\Tests\TestCase;
@@ -21,12 +20,11 @@ uses(TestCase::class)->in('Unit');
  * @param  array<string, mixed>  $entries
  * @param  array<string, array{0: mixed, 1: string}>  $gated  entry plus the ability reading it requires
  */
-function registryAt(string $root, array $entries = [], array $gated = [], RegistryArity|array $arity = RegistryArity::PickOne): BasicRegistry
+function registryAt(string $root, array $entries = [], array $gated = [], ?string $description = null): BasicRegistry
 {
     $store = new BasicRegistry(new IsRegistry(
         root: $root,
-        of: 'test entries',
-        arity: $arity,
+        description: $description,
     ));
 
     foreach ($entries as $key => $entry) {

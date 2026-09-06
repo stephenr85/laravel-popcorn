@@ -7,47 +7,12 @@ use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\Filled;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Registrar;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 
 /**
- * `php artisan popcorn:registries` — the index of indexes. Lists every registry that has described itself
- * into the {@see RegistryIndex}: the root of the keyspace it owns, what it is a registry OF, and how many
- * entries a read engages. The map of "where are the seams" that otherwise lives only in people's heads — so
- * a new engineer (or agent) answers "what registers X, and where do I inject?" from the CLI instead of a
- * codebase sweep.
+ * Lists each registry's root, entry type, description, owner and registrar sources.
  *
- * ## This is a RELOCATION, not a rewrite
- *
- * It is `splicewire/laravel-beam`'s `splicewire:beam:manifests` moved here with the index it renders
- * (registry-kernel tickets 04, 13 D10, 21). Full cutover: the beam command is gone and there is no alias.
- * Writing a second command beside a surviving original — two commands answering one question in two
- * packages after the index had already moved — is the failure 13 D10 named.
- *
- * ## What the relocation dropped, and why
- *
- * - **The `--seam=` filter and the injection legend.** `ManifestSeam` is deleted (ticket 07 D1): its seven
- *   shapes were never a taxonomy of injection points, they were a census of how ~55 registries happened to
- *   get filled *before they shared a contract*. Three of the seven described things that are not registries
- *   or not injection points, one had zero members, and the declared seam lied in three registries. No filter
- *   replaces it yet — one on registrar class is trivially addable, and waits for a populated index to be
- *   worth filtering.
- * - **The `Where` column, replaced by `Fill from`.** Ticket 24 landed `Registrar::source()`, so the column
- *   is now DERIVED: a registry reports the registrars it actually holds and each one says where it reads
- *   from. A hand-written `where` could disagree with the code beside it; this cannot (07 D4).
- *   A registry with no registrars renders `hand`, which is a fact about it rather than a gap — most of the
- *   estate's registries are filled by consumers calling `register()`, and saying so is the answer to "how
- *   do I contribute?"
- * - **The `registerHint` one-liner.** With `of` + `entryType` + the resolve/tryResolve pair, most of the
- *   estate's 52 hand-written hints were derivable; the residue is caveats, which is what `note` carries.
- *   That deleted 52 drift surfaces (01 D10).
- *
- * ## It reads `unfiltered()`
- *
- * Artisan-only tooling, which is ticket 09 D11's sanctioned case for the explicit escape: a catalogue that
- * silently omitted the registries the running actor cannot see would be a catalogue you cannot trust to be
- * complete, and the estate's stated policy is that the shell is trusted. `popcorn:keys` takes the same path
- * for the same reason.
+ * The catalogue reads the unfiltered index so shell tooling sees the full composition.
  */
 class RegistriesCommand extends Command
 {
@@ -55,7 +20,7 @@ class RegistriesCommand extends Command
         {--json : Emit the index as JSON}
         {--shadowing : List entries that went dark because two described roots overlap, instead of the index}';
 
-    protected $description = 'The index of indexes: every registry in the estate, the root it owns, and how a read engages it.';
+    protected $description = 'The index of indexes: every registry in the estate, its entry type, and how it is used.';
 
     public function handle(RegistryIndex $index): int
     {
@@ -92,28 +57,23 @@ class RegistriesCommand extends Command
         }
 
         $this->table(
-            ['Root', 'Arity (out)', 'Of', 'Entry type', 'Fill from', 'Owner'],
+            ['Root', 'Entry type', 'Fill from', 'Owner'],
             array_map(static fn (array $r): array => [
                 $r['root'] === '' ? '(root)' : $r['root'],
-                implode(' › ', $r['arity']),
-                $r['of'],
                 $r['entryType'],
                 $r['sources'] === [] ? 'hand' : implode("\n", $r['sources']),
                 $r['owner'],
             ], $rows),
         );
 
-        $this->newLine();
-        $this->legend($rows);
+        $descriptions = array_values(array_filter($rows, static fn (array $r): bool => $r['description'] !== null));
 
-        $notes = array_values(array_filter($rows, static fn (array $r): bool => $r['note'] !== null));
-
-        if ($notes !== []) {
+        if ($descriptions !== []) {
             $this->newLine();
-            $this->components->info('Caveats:');
+            $this->components->info('Descriptions:');
 
-            foreach ($notes as $row) {
-                $this->line("  <comment>{$row['root']}</comment> — {$row['note']}");
+            foreach ($descriptions as $row) {
+                $this->line("  <comment>{$row['root']}</comment> — {$row['description']}");
             }
         }
 
@@ -186,12 +146,7 @@ class RegistriesCommand extends Command
      * The declaration is read off the OWNER where there is one — under the sanctioned composition pattern
      * the store is a `BasicRegistry` and the attribute lives on the class that holds it (ticket 20 D6).
      *
-     * `arity` is a LIST of step values, outermost first, and stays a list even for the one-step case that
-     * is 77 of 79 registries — ticket 16 records this projection as the presumptive TS wire shape, and a
-     * field that is sometimes a string and sometimes an array is the worst possible thing to put on a
-     * wire (ticket 47). The table joins it; `--json` does not.
-     *
-     * @return list<array{root: string, of: string, arity: non-empty-list<string>, entryType: string, onDuplicate: string, optionality: string, note: string|null, sources: list<string>, owner: string, order: int}>
+     * @return list<array{root: string, entryType: string, onDuplicate: string, optionality: string, description: string|null, sources: list<string>, owner: string, order: int}>
      */
     protected function rows(RegistryIndex $index): array
     {
@@ -209,12 +164,10 @@ class RegistriesCommand extends Command
 
             $rows[] = [
                 'root' => (string) $key,
-                'of' => $declaration->of,
-                'arity' => array_map(static fn (RegistryArity $a): string => $a->value, $declaration->arity),
                 'entryType' => $declaration->entryType,
                 'onDuplicate' => $declaration->onDuplicate->value,
                 'optionality' => $declaration->optionality->value,
-                'note' => $declaration->note,
+                'description' => $declaration->description,
                 'sources' => $this->sourcesOf($owner, $store),
                 'owner' => $owner === null ? ($store === null ? '?' : $store::class) : $owner::class,
                 'order' => $declaration->order,
@@ -263,37 +216,5 @@ class RegistriesCommand extends Command
         return $store instanceof BasicRegistry ? $store->declaration() : null;
     }
 
-    /**
-     * The arity legend, de-duplicated: one line per arity actually present.
-     *
-     * The arity column is the point of this table — it is what makes "is this a registry or a manifest?"
-     * legible (canon: `the-seam-is-a-registry`): both are one primitive, and arity is what actually differs.
-     *
-     * De-duplicated per STEP, not per row: a two-step registry rendered `pick-one › compose-many` needs
-     * both lines, and the row it shares a step with must not suppress either. This is where a multi-level
-     * arity is turned into prose, and it is the renderer's job rather than the enum's —
-     * {@see RegistryArity::blurb()}'s bound is that a case carries prose about ITSELF and nothing else,
-     * so the join lives here (ticket 47). A second renderer of the same thing is when a shared helper
-     * earns its place; one does not.
-     *
-     * @param  list<array{arity: non-empty-list<string>, ...}>  $rows
-     */
-    protected function legend(array $rows): void
-    {
-        $this->components->info('Resolving, by arity (how many entries a read engages, outermost first):');
 
-        $seen = [];
-
-        foreach ($rows as $row) {
-            foreach ($row['arity'] as $step) {
-                if (in_array($step, $seen, true)) {
-                    continue;
-                }
-
-                $seen[] = $step;
-                $arity = RegistryArity::from($step);
-                $this->line("  <comment>{$arity->value}</comment> — {$arity->blurb()}");
-            }
-        }
-    }
 }

@@ -9,7 +9,6 @@ use Rushing\Popcorn\Registries\Exceptions\AmbiguousRegistryMatch;
 use Rushing\Popcorn\Registries\Exceptions\RegistryMiss;
 use Rushing\Popcorn\Registries\Exceptions\UnregisteredRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 
 /**
@@ -21,8 +20,7 @@ function describeStore(string $root, array $entries = []): BasicRegistry
 {
     $store = new BasicRegistry(new IsRegistry(
         root: $root,
-        of: 'test entries',
-        arity: RegistryArity::PickOne,
+        description: 'test entries',
     ));
 
     foreach ($entries as $key => $entry) {

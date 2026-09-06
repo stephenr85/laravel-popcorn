@@ -4,7 +4,6 @@ use Rushing\Popcorn\Laravel\Facades\Popcorn;
 use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Registrars\ConfigRegistrar;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Rushing\Popcorn\Tests\Fixtures\ScannedThing;
 
@@ -16,8 +15,7 @@ function storeFor(string $root): BasicRegistry
 {
     return new BasicRegistry(new IsRegistry(
         root: $root,
-        of: 'test entries',
-        arity: RegistryArity::PickOne,
+        description: 'test entries',
     ));
 }
 

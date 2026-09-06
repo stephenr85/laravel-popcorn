@@ -5,7 +5,6 @@ use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\CarriesDeclaration;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Registry;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Rushing\Popcorn\Registries\RegistryKey;
 use Rushing\Popcorn\Tests\Fixtures\NamespaceUriKey;
@@ -35,8 +34,7 @@ it('keeps the pipe-friendly one-key-per-line output where nobody named a registr
     // would be worse than the lines it replaced, and would break every pipe into grep for no gain.
     $store = new BasicRegistry(new IsRegistry(
         root: 'beam.anon',
-        of: 'test entries',
-        arity: RegistryArity::PickOne,
+        description: 'test entries',
     ));
     $store->register('tenant', 'a');
     $store->register('user', 'b');
@@ -116,8 +114,7 @@ it('lists a foreign-keyed registry only at its own root, and renders each key as
     // narrow by, and its rendering is the owner's rather than a dotted address.
     $store = new BasicRegistry(new IsRegistry(
         root: 'jsonns.namespaces',
-        of: 'namespaces by URI',
-        arity: RegistryArity::PickOne,
+        description: 'namespaces by URI',
     ));
     $store->register(NamespaceUriKey::of('https://schemastud.dev/ns/grounding/2'), 'the schema', by: 'tests');
     app(RegistryIndex::class)->describe($store);
@@ -161,7 +158,7 @@ it('distinguishes "no history kept" from "nothing was overwritten" — the Confi
     // same claim as a clean run. 19 D5's measurement is why this warns instead of printing an empty
     // result: the config-fed registrants bypass register() entirely, so OnDuplicate never runs and the
     // record dies with the projection.
-    $store = new class(new IsRegistry(root: 'beam.historyless', of: 'test entries', arity: RegistryArity::PickOne)) implements CarriesDeclaration, Registry
+    $store = new class(new IsRegistry(root: 'beam.historyless', description: 'test entries')) implements CarriesDeclaration, Registry
     {
         private BasicRegistry $entries;
 

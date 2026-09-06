@@ -238,7 +238,7 @@ abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
      * The current config array projected onto the kernel's one implementation of the contract.
      *
      * Built per call on purpose — see the class docblock. Registration order is the config array's own
-     * order, which is what a `RunAll` pipeline like `data-schemas.strategies` means by it.
+     * order, as required by a pipeline such as `data-schemas.strategies`.
      */
     /** @return BasicRegistry<TEntry> */
     protected function store(): BasicRegistry

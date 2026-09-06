@@ -6,7 +6,6 @@ use Rushing\Popcorn\Laravel\Registries\ConfigRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
 use Rushing\Popcorn\Registries\OnDuplicate;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryKey;
 
 /**
@@ -16,9 +15,8 @@ use Rushing\Popcorn\Registries\RegistryKey;
  */
 #[IsRegistry(
     root: 'fixture.strategies',
-    of: 'an ordered strategy pipeline',
-    arity: RegistryArity::RunAll,
     onDuplicate: OnDuplicate::Supersede,
+    description: 'an ordered strategy pipeline',
 )]
 class PipelineStrategiesRegistry extends ConfigRegistry
 {

@@ -6,7 +6,6 @@ use Rushing\Popcorn\Laravel\Rules\ExistsInRegistry;
 use Rushing\Popcorn\Registries\AbsoluteUriKey;
 use Rushing\Popcorn\Registries\BasicRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
-use Rushing\Popcorn\Registries\RegistryArity;
 use Rushing\Popcorn\Registries\RegistryIndex;
 use Rushing\Popcorn\Registries\RelativeUriKey;
 use Rushing\Popcorn\Tests\Fixtures\NamespaceUriKey;
@@ -124,8 +123,7 @@ it('raises a developer error rather than failing the user on an unaddressable re
     // the developer's mistake (13 D4).
     $store = new BasicRegistry(new IsRegistry(
         root: 'jsonns.namespaces',
-        of: 'namespaces by URI',
-        arity: RegistryArity::PickOne,
+        description: 'namespaces by URI',
     ));
     $store->register(NamespaceUriKey::of('https://schemastud.dev/ns/grounding/2'), 'the schema', by: 'tests');
     app(RegistryIndex::class)->describe($store);
@@ -156,8 +154,7 @@ it('ACCEPTS a slash-spelled prefix and the registry behind it, which is what 64 
     // from the owning package's own suite.
     $store = new BasicRegistry(new IsRegistry(
         root: 'nav.kinds',
-        of: 'nav kinds',
-        arity: RegistryArity::PickOne,
+        description: 'nav kinds',
     ));
     $store->register(RelativeUriKey::of('nav/link'), 'the link kind', by: 'tests');
     app(RegistryIndex::class)->describe($store);
