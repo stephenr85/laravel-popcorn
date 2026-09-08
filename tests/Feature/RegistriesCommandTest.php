@@ -13,7 +13,7 @@ it('emits the entry type and optional description without the retired metadata',
         ->and($row['entryType'])->toBe('mixed')
         ->and($row['description'])->toBe('Realm definitions available to this host.')
         ->and(array_keys($row))->toBe([
-            'root', 'entryType', 'onDuplicate', 'optionality', 'description', 'sources', 'owner', 'order',
+            'root', 'entryType', 'onKeyDuplicate', 'populationRequirement', 'description', 'sources', 'owner', 'order',
         ]);
 });
 

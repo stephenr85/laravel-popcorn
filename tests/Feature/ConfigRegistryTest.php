@@ -158,7 +158,7 @@ it('replaces in place rather than appending a duplicate — the estate\'s in_arr
     config(['fixture.strategies' => fiveRegistrants()]);
 
     // What a provider re-registering on a second boot does. The `in_array` guard five packages
-    // hand-roll is exactly OnDuplicate::Supersede once the entry has a key.
+    // hand-roll is exactly OnKeyDuplicate::Supersede once the entry has a key.
     app(PipelineStrategiesRegistry::class)
         ->register('widget-attributes-strategy', 'Schemastud\Frame\Strategies\WidgetAttributesStrategy');
 

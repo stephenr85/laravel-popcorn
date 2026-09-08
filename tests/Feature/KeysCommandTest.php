@@ -156,7 +156,7 @@ it('says nothing was overwritten rather than printing an empty table', function 
 it('distinguishes "no history kept" from "nothing was overwritten" — the ConfigRegistry hole, said out loud', function () {
     // A registry that does not implement RecordsSupersession has nothing to report, and that is not the
     // same claim as a clean run. 19 D5's measurement is why this warns instead of printing an empty
-    // result: the config-fed registrants bypass register() entirely, so OnDuplicate never runs and the
+    // result: the config-fed registrants bypass register() entirely, so OnKeyDuplicate never runs and the
     // record dies with the projection.
     $store = new class(new IsRegistry(root: 'beam.historyless', description: 'test entries')) implements CarriesDeclaration, Registry
     {

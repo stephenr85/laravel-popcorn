@@ -165,7 +165,7 @@ class KeysCommand extends Command
      *
      * **`ConfigRegistry`'s hole is bigger than its own absence, and it is worth knowing.** The estate's
      * config-fed registrants bypass `register()` entirely — `laravel-data-filters` and `laravel-frame`
-     * read the config array, append under an `in_array` guard, and write it back — so `OnDuplicate` never
+     * read the config array, append under an `in_array` guard, and write it back — so `OnKeyDuplicate` never
      * runs on that path at all and the record dies with the projection. Today that is safe: the map shape
      * cannot represent a duplicate, and the list shape collides only when two registrants register the
      * same class, which the guard already makes a no-op. **The first registrant that writes through

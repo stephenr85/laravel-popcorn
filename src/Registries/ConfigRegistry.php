@@ -50,7 +50,7 @@ use Rushing\Popcorn\Registries\RegistryNode;
  * ## Projected onto `BasicRegistry`, rebuilt per read
  *
  * Every read builds a {@see BasicRegistry} from the current config array and asks it the question. That
- * is not a cache miss — it is the point: root stamping, registration order, `OnDuplicate`, ambiguity and
+ * is not a cache miss — it is the point: root stamping, registration order, `OnKeyDuplicate`, ambiguity and
  * the authorization filter are then the kernel's ONE implementation of registry semantics rather than a
  * second one drifting beside it. The arrays are three to seven entries; the projection costs nothing
  * that matters, and it cannot go stale.

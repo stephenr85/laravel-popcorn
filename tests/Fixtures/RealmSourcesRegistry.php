@@ -4,7 +4,7 @@ namespace Rushing\Popcorn\Tests\Fixtures;
 
 use Rushing\Popcorn\Laravel\Registries\ConfigRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
-use Rushing\Popcorn\Registries\OnDuplicate;
+use Rushing\Popcorn\Registries\OnKeyDuplicate;
 
 /**
  * The MAP-shaped config registry, modelled on `splicewire/laravel-beam`'s `beam.client.sources` — a
@@ -12,7 +12,7 @@ use Rushing\Popcorn\Registries\OnDuplicate;
  */
 #[IsRegistry(
     root: 'fixture.client.sources',
-    onDuplicate: OnDuplicate::Supersede,
+    onKeyDuplicate: OnKeyDuplicate::Supersede,
     description: 'route manifest sources by realm',
 )]
 class RealmSourcesRegistry extends ConfigRegistry

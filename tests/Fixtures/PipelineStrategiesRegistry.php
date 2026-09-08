@@ -5,7 +5,7 @@ namespace Rushing\Popcorn\Tests\Fixtures;
 use Rushing\Popcorn\Laravel\Registries\ConfigRegistry;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
-use Rushing\Popcorn\Registries\OnDuplicate;
+use Rushing\Popcorn\Registries\OnKeyDuplicate;
 use Rushing\Popcorn\Registries\RegistryKey;
 
 /**
@@ -15,7 +15,7 @@ use Rushing\Popcorn\Registries\RegistryKey;
  */
 #[IsRegistry(
     root: 'fixture.strategies',
-    onDuplicate: OnDuplicate::Supersede,
+    onKeyDuplicate: OnKeyDuplicate::Supersede,
     description: 'an ordered strategy pipeline',
 )]
 class PipelineStrategiesRegistry extends ConfigRegistry

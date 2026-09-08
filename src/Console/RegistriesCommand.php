@@ -146,7 +146,7 @@ class RegistriesCommand extends Command
      * The declaration is read off the OWNER where there is one — under the sanctioned composition pattern
      * the store is a `BasicRegistry` and the attribute lives on the class that holds it (ticket 20 D6).
      *
-     * @return list<array{root: string, entryType: string, onDuplicate: string, optionality: string, description: string|null, sources: list<string>, owner: string, order: int}>
+     * @return list<array{root: string, entryType: string, onKeyDuplicate: string, populationRequirement: string, description: string|null, sources: list<string>, owner: string, order: int}>
      */
     protected function rows(RegistryIndex $index): array
     {
@@ -165,8 +165,8 @@ class RegistriesCommand extends Command
             $rows[] = [
                 'root' => (string) $key,
                 'entryType' => $declaration->entryType,
-                'onDuplicate' => $declaration->onDuplicate->value,
-                'optionality' => $declaration->optionality->value,
+                'onKeyDuplicate' => $declaration->onKeyDuplicate->value,
+                'populationRequirement' => $declaration->populationRequirement->value,
                 'description' => $declaration->description,
                 'sources' => $this->sourcesOf($owner, $store),
                 'owner' => $owner === null ? ($store === null ? '?' : $store::class) : $owner::class,

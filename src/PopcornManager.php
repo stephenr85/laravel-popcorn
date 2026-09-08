@@ -228,7 +228,7 @@ class PopcornManager
      *
      * Missing config is an empty registrar rather than an error: a host that has not published a config
      * file has contributed nothing, which is not the same as being misconfigured, and
-     * {@see \Rushing\Popcorn\Registries\Optionality} is where a registry says whether empty is a problem.
+     * {@see \Rushing\Popcorn\Registries\PopulationRequirement} is where a registry says whether empty is a problem.
      */
     public function configRegistrar(string $key): ConfigRegistrar
     {
