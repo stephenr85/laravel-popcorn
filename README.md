@@ -165,6 +165,31 @@ A rung (`Strategy`) returns a `StrategyResult` it can stand behind (`value`,
 self-validate-and-demote discipline: a strong rung that can't be sure defers
 rather than guessing. `$ladder->rungs()` lists the rung names, strongest-first.
 
+## Registry validation and enumeration
+
+`Rushing\Popcorn\Laravel\Rules\ExistsInRegistry` validates visible, fully qualified keys
+under a registry prefix. The same rule exposes `contains($value)` and `values()` for route
+validation and schema generation:
+
+```php
+use Rushing\Popcorn\Laravel\Rules\ExistsInRegistry;
+use Rushing\Popcorn\Registries\Key;
+
+$rule = new ExistsInRegistry('app.formats', relative: true,
+    where: fn (Key $key): bool => $key->isUnder('app.formats.document'));
+
+$rules = ['format' => ['required', $rule]];
+$choices = $rule->values(); // e.g. ['document.json', 'document.markdown']
+```
+
+`relative: true` accepts suffixes only; the default accepts fully qualified keys. The optional
+predicate receives a canonical key after membership and visibility checks. It must be a read-only
+predicate so validation and enumeration have the same result. Values are sorted and read fresh,
+including nested registry owners; hidden entries never enter the enum, predicate or suggestions.
+An empty vocabulary means no accepted values. A prefix without a registered owner raises a developer
+error rather than returning an empty list. Generate documentation under its intended audience and
+never share a cached actor-specific vocabulary across actors.
+
 ## Tests
 
 ```bash

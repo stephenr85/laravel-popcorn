@@ -20,11 +20,10 @@ use Rushing\Popcorn\Registries\Rootable;
  * the house pattern. `splicewire/laravel-beam-accounts`' `*ValidationRules` concerns return rule ARRAYS
  * and are a different thing.
  *
- * ## One argument, a prefix, and no glob
- *
- * There is no second form and no `beam.realm.*` (13 D2). A root IS a prefix, so pointing the rule at a
- * whole registry is the same call; a pattern language would be the mini-language ticket 05 deleted,
- * re-entering through the validator.
+ * A prefix still names the scope; globs are not accepted. `relative: true` declares suffix-only
+ * wire values, and `where` can narrow visible canonical keys to a domain subset. `values()` exposes
+ * exactly that live vocabulary for schemas and route documentation, under the current authorizer.
+ * Recompute it for each publication context; do not cache one actor's vocabulary for another.
  *
  * ## It asks the registry the question the resolver will ask
  *
@@ -78,8 +77,12 @@ class ExistsInRegistry implements ValidationRule
 {
     private Key $prefix;
 
-    public function __construct(RegistryKey|string $prefix)
-    {
+    /** @param (Closure(Key): bool)|null $where */
+    public function __construct(
+        RegistryKey|string $prefix,
+        private bool $relative = false,
+        private ?Closure $where = null,
+    ) {
         $coerced = Key::of($prefix);
         $original = $coerced;
 
@@ -107,7 +110,7 @@ class ExistsInRegistry implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $key = is_string($value) ? Key::tryParse($value) : null;
+        $key = $this->key($value);
 
         // Legality first, and it touches no registry: an illegal key could not be registered, so
         // asking a registry about it would only turn a spelling error into a lookup miss.
@@ -121,18 +124,93 @@ class ExistsInRegistry implements ValidationRule
 
         $this->assertUsable();
 
+        if (! $this->accepts($key)) {
+            $this->miss($fail, $key);
+        }
+    }
+
+    /** Parse the declared wire spelling without consulting a registry. */
+    public function key(mixed $value): ?Key
+    {
+        $key = is_string($value) ? Key::tryParse($value) : null;
+
+        if ($key === null || ! $this->relative) {
+            return $key;
+        }
+
+        // Relative means a suffix, never the kernel door's absolute-or-relative heuristic. This
+        // ensures the accepted spellings and the emitted enum have exactly the same membership.
+        return Key::fromSegments([...$this->prefix->segments(), ...$key->segments()]);
+    }
+
+    public function contains(mixed $value): bool
+    {
+        $key = $this->key($value);
+
+        if ($key === null) {
+            return false;
+        }
+
+        $this->assertUsable();
+
+        return $this->accepts($key);
+    }
+
+    /**
+     * Visible accepted wire values, sorted for reproducible schema output. An empty array means
+     * nothing is accepted; schema consumers must preserve that, not omit the constraint.
+     *
+     * @return list<string>
+     */
+    public function values(): array
+    {
+        $this->assertUsable();
+        $index = $this->popcorn()->index();
+        $values = [];
+
+        // Include the owning ancestor and nested roots: longest-prefix routing may hand a value
+        // under this prefix to a deeper registry. Exclude the self-hosted index's registry names.
+        $registries = [$this->popcorn()->routeTo($this->prefix), ...$index->matches($this->prefix)];
+
+        foreach ($registries as $registry) {
+            if ($registry === null || $registry === $index) {
+                continue;
+            }
+
+            foreach ($registry->keys() as $key) {
+                if ($key instanceof Key && $this->accepts($key)) {
+                    $values[] = $this->wireValue($key);
+                }
+            }
+        }
+
+        $values = array_values(array_unique($values));
+        sort($values, SORT_STRING);
+
+        return $values;
+    }
+
+    private function accepts(Key $key): bool
+    {
         if (! $key->equals($this->prefix) && ! $key->isUnder($this->prefix)) {
-            $this->miss($fail, $key);
-
-            return;
+            return false;
         }
 
-        // Routed on the VALUE rather than on the prefix, deliberately: interleaved roots are legal, so
-        // a nested registry may own a key that is genuinely under the prefix (ticket 26 D0). Longest
-        // prefix picks the registry that owns the key; the scope check above already fixed the branch.
-        if (! $this->popcorn()->routeTo($key)?->has($key)) {
-            $this->miss($fail, $key);
+        if ($this->relative && $key->equals($this->prefix)) {
+            return false;
         }
+
+        // Route on the value: nested registry roots are legal. Check visibility before invoking a
+        // domain predicate, so even the predicate cannot observe an entry hidden from this actor.
+        return ($this->popcorn()->routeTo($key)?->has($key) ?? false)
+            && ($this->where === null || ($this->where)($key));
+    }
+
+    private function wireValue(Key $key): string
+    {
+        return $this->relative
+            ? implode('.', array_slice($key->segments(), count($this->prefix->segments())))
+            : (string) $key;
     }
 
     /**
@@ -184,14 +262,14 @@ class ExistsInRegistry implements ValidationRule
         $suggestions = array_values(array_filter(
             $this->popcorn()->suggest($key),
             fn (string $candidate): bool => ($parsed = Key::tryParse($candidate)) !== null
-                && ($parsed->equals($this->prefix) || $parsed->isUnder($this->prefix)),
+                && $this->accepts($parsed),
         ));
 
         $message = "The :attribute is not a registered key under `{$this->prefix}`.";
 
         if ($suggestions !== []) {
             $message .= ' Did you mean '.implode(', ', array_map(
-                static fn (string $candidate): string => "`{$candidate}`",
+                fn (string $candidate): string => "`{$this->wireValue(Key::parse($candidate))}`",
                 $suggestions,
             )).'?';
         }

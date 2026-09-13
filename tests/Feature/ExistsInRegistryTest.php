@@ -176,3 +176,58 @@ it('rejects a non-string value as a declaration error rather than crashing', fun
 
     expect(failureFor(['beam.realm.tenant']))->toContain('not a legal registry key');
 });
+
+it('uses one live vocabulary for relative validation and subset enumeration', function () {
+    registryAt('beam.realm', ['tenant' => 'a', 'user' => 'b', 'tenant.archive' => 'c']);
+    $rule = new ExistsInRegistry('beam.realm', relative: true,
+        where: fn (Rushing\Popcorn\Registries\Key $key): bool => $key->isUnder('beam.realm.tenant') || (string) $key === 'beam.realm.tenant');
+
+    expect($rule->values())->toBe(['tenant', 'tenant.archive'])
+        ->and($rule->contains('tenant'))->toBeTrue()
+        ->and($rule->contains('tenant.archive'))->toBeTrue()
+        ->and($rule->contains('user'))->toBeFalse()
+        ->and($rule->contains('beam.realm.tenant'))->toBeFalse()
+        ->and($rule->contains('Tenant'))->toBeFalse()
+        ->and($rule->contains(['tenant']))->toBeFalse();
+
+    $validator = Validator::make(['realm' => 'user'], ['realm' => [$rule]]);
+    expect($validator->fails())->toBeTrue();
+});
+
+it('enumerates the canonical vocabulary through nested owners and changing authorization', function () {
+    $store = registryAt('beam.realm', ['tenant' => 'a', 'overlays.legacy' => 'shadowed'], ['payroll' => ['b', 'view-payroll']]);
+    registryAt('beam.realm.overlays', ['article' => 'c']);
+    $rule = new ExistsInRegistry('beam.realm');
+
+    expect($rule->values())->toBe(['beam.realm.overlays.article', 'beam.realm.payroll', 'beam.realm.tenant']);
+    Popcorn::authorizeWith(denyEverything());
+    expect($rule->values())->toBe(['beam.realm.overlays.article', 'beam.realm.tenant'])
+        ->and($rule->contains('beam.realm.payroll'))->toBeFalse();
+    $store->register('user', 'd', by: 'tests');
+    expect($rule->values())->toBe(['beam.realm.overlays.article', 'beam.realm.tenant', 'beam.realm.user']);
+});
+
+it('does not expose hidden or excluded keys to predicates or suggestions', function () {
+    registryAt('beam.realm', ['tenant' => 'a', 'tenancy' => 'b'], ['tenan' => ['c', 'secret']]);
+    Popcorn::authorizeWith(denyEverything());
+    $seen = [];
+    $rule = new ExistsInRegistry('beam.realm', relative: true,
+        where: function ($key) use (&$seen): bool {
+            $seen[] = (string) $key;
+
+            return (string) $key === 'beam.realm.tenant';
+        });
+    $validator = Validator::make(['realm' => 'tenan'], ['realm' => [$rule]]);
+    $message = $validator->errors()->first('realm');
+
+    expect($message)->toContain('`tenant`')->not->toContain('`tenancy`')->not->toContain('`tenan`')
+        ->and($rule->values())->toBe(['tenant'])
+        ->and($seen)->not->toContain('beam.realm.tenan');
+});
+
+it('distinguishes empty membership from an unregistered vocabulary', function () {
+    registryAt('beam.realm');
+    expect((new ExistsInRegistry('beam.realm'))->values())->toBe([])
+        ->and(fn () => (new ExistsInRegistry('missing.root'))->values())
+        ->toThrow(InvalidArgumentException::class, 'No registry claims');
+});
