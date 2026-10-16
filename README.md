@@ -197,6 +197,20 @@ composer install
 vendor/bin/pest
 ```
 
+## Deploy step: bake the registries
+
+Production (and any `config:cache`d process) resolves registries from the BAKED index:
+
+```
+php artisan popcorn:registries:cache
+```
+
+Run it on deploy, after `composer install` — the live-vendor-reconcile runbook already ends with
+it. Without the bake, resolution throws `UnbakedRegistryIndex` (loud by design: an unbaked index
+answering from memory would be a different registry per process). Local dev auto-bakes via
+testbench; this paragraph exists because the step was previously learned from the exception
+(architecture-pass A1-C3).
+
 ## Licence
 
 MIT
