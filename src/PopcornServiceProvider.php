@@ -12,6 +12,7 @@ use Rushing\Popcorn\Laravel\Console\CacheRegistriesCommand;
 use Rushing\Popcorn\Laravel\Console\ClearRegistriesCommand;
 use Rushing\Popcorn\Laravel\Console\KeysCommand;
 use Rushing\Popcorn\Laravel\Console\RegistriesCommand;
+use Rushing\Popcorn\Laravel\Console\RegistryDocsCommand;
 use Rushing\Popcorn\Laravel\Facades\Popcorn;
 use Rushing\Popcorn\Registries\Exceptions\UnbakedRegistryIndex;
 use Rushing\Popcorn\Registries\RegistryIndex;
@@ -105,6 +106,7 @@ class PopcornServiceProvider extends ServiceProvider
                 KeysCommand::class,
                 CacheRegistriesCommand::class,
                 ClearRegistriesCommand::class,
+                RegistryDocsCommand::class,
             ]);
 
             // `optimize:clear` removes the baked list the way it removes `bootstrap/cache/packages.php`.
