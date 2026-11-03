@@ -40,9 +40,12 @@ $registry->register(new RemoteInvocable('tag-ingredient', Binding::Webhook, $htt
 $registry->invoke('tag-ingredient', ['raw' => 'Tirzepatide 10mg']);
 ```
 
-**Registering under an existing name overrides it** — the seam where a host swaps a
-local default for a tenant's webhook without callers changing. The rest of the
-registry surface:
+**Registering under an existing name overrides it here**, because `InvocableRegistry`
+declares the Supersede duplicate policy: the new entry replaces the old one in its place. That is
+the seam where a host swaps a local default for a tenant's webhook without callers changing. Not
+every registry behaves this way. Each declares its own policy: under Reject a duplicate key throws
+`DuplicateRegistryKey` at registration, and under Admit both entries are kept and a single-entry
+read of that key refuses as ambiguous. The rest of the registry surface:
 
 ```php
 $registry->has('tag-ingredient');    // bool
@@ -83,7 +86,8 @@ composes over a sandboxed run unchanged:
 
 ```php
 use Rushing\Popcorn\Invocables\RunnerInvocable;
-use Rushing\Popcorn\Runner\{Manifest, Grant, NullRunner};
+use Rushing\Popcorn\Laravel\Runner\NullRunner;
+use Rushing\Popcorn\Runner\{Manifest, Grant};
 
 $manifest = Manifest::fromFile('/bundles/shape-payload/popcorn.json');
 $grant    = Grant::none();                 // effective grant, resolved host-side (never a superset of the request)
@@ -117,7 +121,7 @@ tool, or a webhook are all cached the same way ("remote" is a binding; "cached" 
 a decorator):
 
 ```php
-use Rushing\Popcorn\Invocables\CachedInvocable;
+use Rushing\Popcorn\Laravel\Invocables\CachedInvocable;
 
 $registry->register(new CachedInvocable(
     $inner,                                   // any Invocable
@@ -151,17 +155,17 @@ Adding a provider is a `register()` call; adding a whole capability is a new key
 ## Strategy ladders
 
 ```php
-use Rushing\Popcorn\Strategy\StrategyLadder;
+use Rushing\Popcorn\Ladders\Ladder;
 
-$ladder = new StrategyLadder($exactMatch, $embeddingSimilarity, $reviewerConfirmed);
+$ladder = new Ladder($exactMatch, $embeddingSimilarity, $reviewerConfirmed);
 
 // Strongest rung first; weaker rungs are tried only when stronger ones abstain
 // or fall short. Null means every rung declined — the caller's reviewer floor.
-$result = $ladder->resolve($input, acceptAbove: 0.7);
+$result = $ladder->climb($input, acceptAbove: 0.7);
 ```
 
-A rung (`Strategy`) returns a `StrategyResult` it can stand behind (`value`,
-`confidence`, `strategy`), or `null` to step aside. That is the
+A rung (`Rung`) returns a `RungResult` it can stand behind (`value`,
+`confidence`, `rung`), or `null` to step aside. That is the
 self-validate-and-demote discipline: a strong rung that can't be sure defers
 rather than guessing. `$ladder->rungs()` lists the rung names, strongest-first.
 
@@ -189,6 +193,52 @@ including nested registry owners; hidden entries never enter the enum, predicate
 An empty vocabulary means no accepted values. A prefix without a registered owner raises a developer
 error rather than returning an empty list. Generate documentation under its intended audience and
 never share a cached actor-specific vocabulary across actors.
+
+## Registries
+
+This package declares no registry of its own. The registry kernel, `#[IsRegistry]` and
+`InvocableRegistry` (root [`popcorn.invocables`](https://github.com/stephenr85/php-popcorn/blob/main/docs/registries/popcorn.invocables.mdx))
+come from [`rushing/php-popcorn`](https://github.com/stephenr85/php-popcorn); this package binds
+them into Laravel and adds the commands below. `php artisan popcorn:registries` lists the
+registries a host has, and `php artisan popcorn:keys <prefix>` lists the keys under a prefix.
+
+## Documenting your registries
+
+A package documents each registry it declares with one page, `docs/registries/<root>.mdx`, named
+by the dotted root verbatim (`docs/registries/graph.stores.mdx`). A root whose page lives elsewhere,
+or that is deliberately undocumented, is listed in `docs/registries/manifest.json` instead, as an
+override path, an external URL, or an exemption with its reason. The package README then gets a
+short Registries section that links each page; the facts about a registry (entry type, duplicate
+policy, order) stay on its page, where they're generated from the declaration.
+
+Creating the `docs/registries/` directory opts the package in. From then on one test keeps it
+honest: every declared root must be covered, every page and manifest entry must name a root the
+package declares, and each page's generated facts must match the declaration. Add it to your
+suite, with a count of the roots you expect so a root that stops being scanned can't pass silently:
+
+```php
+use Rushing\Popcorn\Registries\Docs\RegistryDocsCheck;
+
+it('documents every declared registry root', function () {
+    $report = RegistryDocsCheck::forPackage(dirname(__DIR__))->run();
+
+    expect($report->failures())->toBe([], $report->summary())
+        ->and($report->coverage)->toHaveCount(2);   // the number of roots this package declares
+});
+```
+
+`dirname(__DIR__)` is the package root when the test sits directly in `tests/`; a test in
+`tests/Feature/` uses `dirname(__DIR__, 2)`. A package without the directory gets an inactive report,
+which passes. The check only reads.
+
+The same check runs from artisan, for a CI step or a host:
+
+```bash
+php artisan popcorn:registries:docs            # the root package
+php artisan popcorn:registries:docs path/to/pkg --json
+```
+
+It exits non-zero when anything is uncovered or has drifted.
 
 ## Tests
 
