@@ -202,6 +202,25 @@ come from [`rushing/php-popcorn`](https://github.com/stephenr85/php-popcorn); th
 them into Laravel and adds the commands below. `php artisan popcorn:registries` lists the
 registries a host has, and `php artisan popcorn:keys <prefix>` lists the keys under a prefix.
 
+## Making a registry
+
+```bash
+php artisan popcorn:make:registry ReportFormatRegistry --key=app.report-formats
+```
+
+This writes `app/Registries/ReportFormatRegistry.php`. The class declares its root and duplicate
+policy with `#[IsRegistry]`, implements `Gated` and `Registry`, holds a `BasicRegistry`, and forwards
+the reads and the host's authorizer to it through php-popcorn's `ForwardsToRegistryStore` trait. You
+add a description and your own methods.
+
+`--key` is the root the registry owns, in dotted lowercase-kebab; an illegal key is refused. Where
+`splicewire/laravel-beam-docs` is installed, the command runs its registry docs scaffolder for that
+root; elsewhere it tells you which page to write. It then prints the singleton binding to add to a
+provider, the `popcorn:registries:cache` bake that describes the class into the index, and the
+registry-conformance artifact command for hosts that run `splicewire/laravel-beam`. It edits no
+provider itself. The stub is `stubs/registry.stub`; a host overrides it by placing its own at the
+same path under its base path.
+
 ## Documenting your registries
 
 A package documents each registry it declares with one page, `docs/registries/<root>.mdx`, named
