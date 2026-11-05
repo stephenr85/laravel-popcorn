@@ -213,13 +213,18 @@ policy with `#[IsRegistry]`, implements `Gated` and `Registry`, holds a `BasicRe
 the reads and the host's authorizer to it through php-popcorn's `ForwardsToRegistryStore` trait. You
 add a description and your own methods.
 
-`--key` is the root the registry owns, in dotted lowercase-kebab; an illegal key is refused. Where
-`splicewire/laravel-beam-docs` is installed, the command runs its registry docs scaffolder for that
-root; elsewhere it tells you which page to write. It then prints the singleton binding to add to a
-provider, the `popcorn:registries:cache` bake that describes the class into the index, and the
-registry-conformance artifact command for hosts that run `splicewire/laravel-beam`. It edits no
-provider itself. The stub is `stubs/registry.stub`; a host overrides it by placing its own at the
-same path under its base path.
+`--key` is the root the registry owns, in dotted lowercase-kebab; an illegal key is refused. The
+command then prints what is left to do, and does none of it:
+
+- the docs page to write, `docs/registries/<root>.mdx`, and the
+  `splicewire:beam:docs:registries:scaffold` line that writes it where `splicewire/laravel-beam-docs`
+  is installed. That command is printed and never called, because this package cannot depend on beam;
+- the singleton binding to add to a provider;
+- the `popcorn:registries:cache` bake that describes the class into the index;
+- the `splicewire:beam:registry-conformance --write` line, for hosts that run `splicewire/laravel-beam`.
+
+The stub is `stubs/registry.stub`; a host overrides it by placing its own at the same path under its
+base path.
 
 ## Documenting your registries
 

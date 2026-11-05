@@ -24,22 +24,25 @@ use Symfony\Component\Console\Input\InputOption;
  * `GeneratorCommand` directly rather than beam's `ParticleGeneratorCommand` (make-surface MAP, Notes).
  * The stub is `stubs/registry.stub`, overridable at the same path under the host's base path.
  *
- * ## The docs page, through the scaffolder that owns it
+ * ## The docs page: printed, never written or called
  *
- * The page writer is `splicewire/laravel-beam-docs`' {@see SCAFFOLD_COMMAND}. Where a host has it
- * registered, this command runs it for the root package and this one root. Elsewhere it says what to
- * write and where. It never writes a page itself: a second page writer would be a second renderer for a
- * facts block that the docs check compares byte for byte.
+ * The page writer is `splicewire/laravel-beam-docs`' {@see SCAFFOLD_COMMAND}. This command prints that
+ * command line, for this root package and this one root, labelled as available where beam-docs is
+ * installed. It never calls it, not even where it is registered: a rushing-tier package cannot depend on
+ * beam, and a guarded call by name would still put a splicewire-tier command inside this one. It never
+ * writes a page itself either, because a second page writer would be a second renderer for a facts block
+ * that the docs check compares byte for byte.
  *
  * ## What it prints instead of doing
  *
- * It edits no provider. It prints the singleton binding, the bake that describes the class into the index
- * (`popcorn:registries:cache`), and the command that records the class in the committed registry
- * conformance artifact ({@see CONFORMANCE_COMMAND}, which ships with `splicewire/laravel-beam`).
+ * It edits no provider and runs no other command. It prints where the docs page goes, the singleton
+ * binding, the bake that describes the class into the index (`popcorn:registries:cache`), and the
+ * command that records the class in the committed registry conformance artifact
+ * ({@see CONFORMANCE_COMMAND}, which ships with `splicewire/laravel-beam`).
  */
 class MakeRegistryCommand extends GeneratorCommand
 {
-    /** The registry docs scaffolder in `splicewire/laravel-beam-docs`. Called by name, only where it is registered. */
+    /** The registry docs scaffolder in `splicewire/laravel-beam-docs`. Printed, never called (tier rule). */
     public const SCAFFOLD_COMMAND = 'splicewire:beam:docs:registries:scaffold';
 
     /** The command that writes the committed registry-conformance artifact, in `splicewire/laravel-beam`. */
@@ -69,11 +72,9 @@ class MakeRegistryCommand extends GeneratorCommand
             return self::FAILURE;
         }
 
-        $documented = $this->document($root);
+        $this->nextSteps($this->qualifyClass($this->getNameInput()), $root);
 
-        $this->nextSteps($this->qualifyClass($this->getNameInput()));
-
-        return $documented ? self::SUCCESS : self::FAILURE;
+        return self::SUCCESS;
     }
 
     protected function getStub(): string
@@ -146,38 +147,21 @@ class MakeRegistryCommand extends GeneratorCommand
         return $key;
     }
 
-    /** Run the docs scaffolder for this root where one is registered; false when it ran and failed. */
-    private function document(string $root): bool
+    /** Every follow-up is printed; nothing here runs another command or edits another file. */
+    private function nextSteps(string $class, string $root): void
     {
-        $package = $this->rootPackage();
-
-        if ($package !== null && $this->getApplication()?->has(self::SCAFFOLD_COMMAND) === true) {
-            $status = $this->call(self::SCAFFOLD_COMMAND, ['package' => $package, '--root' => [$root]]);
-
-            if ($status !== self::SUCCESS) {
-                $this->components->error(sprintf('`%s` exited %d, so the docs page for `%s` was not written.', self::SCAFFOLD_COMMAND, $status, $root));
-
-                return false;
-            }
-
-            return true;
-        }
-
-        $this->components->warn(sprintf(
-            'No registry docs scaffolder is registered here (`%s` ships with splicewire/laravel-beam-docs). '
-                .'Write docs/registries/%s.mdx, or list `%s` in docs/registries/manifest.json; '
-                .'`popcorn:registries:docs` checks either.',
-            self::SCAFFOLD_COMMAND,
+        $this->components->info('Next:');
+        $this->line(sprintf(
+            '  Document it: docs/registries/%s.mdx, or list `%s` in docs/registries/manifest.json; `popcorn:registries:docs` checks either.',
             $root,
             $root,
         ));
-
-        return true;
-    }
-
-    private function nextSteps(string $class): void
-    {
-        $this->components->info('Next:');
+        $this->line(sprintf(
+            '  Where splicewire/laravel-beam-docs is installed, its scaffolder writes that page: php artisan %s %s --root=%s',
+            self::SCAFFOLD_COMMAND,
+            $this->rootPackage() ?? '<vendor/name>',
+            $root,
+        ));
         $this->line(sprintf('  Bind it once, in a service provider\'s register(): $this->app->singleton(\\%s::class);', ltrim($class, '\\')));
         $this->line(sprintf('  Describe it into the index by baking the membership list: php artisan %s', BakedRegistryManifest::COMMAND));
         $this->line(sprintf('  Record it in the registry-conformance artifact (splicewire/laravel-beam): php artisan %s --write', self::CONFORMANCE_COMMAND));

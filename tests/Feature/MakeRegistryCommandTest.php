@@ -16,8 +16,8 @@ use Rushing\Popcorn\Registries\RegistryIndex;
 
 /**
  * `popcorn:make:registry` (make-surface 05): the class it writes is declared, gated and forwarding, it
- * loads, the bake describes it, the index's authorizer filters it, and the docs scaffolder is asked for
- * exactly its root.
+ * loads, the bake describes it, and the index's authorizer filters it. The beam-docs scaffold line is
+ * printed for exactly its root and never called, because a rushing-tier package cannot depend on beam.
  *
  * Each test points the app path at a scratch directory, so a run never writes into testbench's skeleton
  * under vendor/. The app namespace is read first and memoised, because Laravel derives it by matching the
@@ -104,54 +104,42 @@ it('is described by the bake and filtered by the index authorizer', function () 
         ->and($registry->unfiltered()->has('closed'))->toBeTrue();
 });
 
-it('runs the docs scaffolder for the root package and exactly this root, where one is registered', function () {
+it('prints the beam-docs scaffold line and never calls it, even where a command of that name is registered', function () {
+    // The tier rule, held down: a rushing-tier package cannot depend on beam, so the scaffolder is
+    // printed, never run. A command registered under its name must see no call at all.
     $scaffold = new class extends Command
     {
         protected $signature = 'splicewire:beam:docs:registries:scaffold {package?} {--root=*}';
 
-        /** @var list<array{0: mixed, 1: mixed}> */
-        public array $calls = [];
+        public int $calls = 0;
 
         public function handle(): int
         {
-            $this->calls[] = [$this->argument('package'), $this->option('root')];
+            $this->calls++;
 
             return self::SUCCESS;
         }
     };
     Artisan::registerCommand($scaffold);
 
-    [$status] = makeRegistry(['name' => 'ReportFormatRegistry', '--key' => 'app.report-formats']);
+    [$status, $output] = makeRegistry(['name' => 'ReportFormatRegistry', '--key' => 'app.report-formats']);
 
     expect(MakeRegistryCommand::SCAFFOLD_COMMAND)->toBe('splicewire:beam:docs:registries:scaffold')
         ->and($status)->toBe(0)
-        ->and($scaffold->calls)->toBe([[InstalledVersions::getRootPackage()['name'], ['app.report-formats']]]);
+        ->and($scaffold->calls)->toBe(0)
+        ->and($output)->toContain(sprintf(
+            'Where splicewire/laravel-beam-docs is installed, its scaffolder writes that page: php artisan %s %s --root=app.report-formats',
+            MakeRegistryCommand::SCAFFOLD_COMMAND,
+            InstalledVersions::getRootPackage()['name'],
+        ));
 });
 
-it('exits non-zero when the docs scaffolder fails, after writing the class', function () {
-    Artisan::registerCommand(new class extends Command
-    {
-        protected $signature = 'splicewire:beam:docs:registries:scaffold {package?} {--root=*}';
-
-        public function handle(): int
-        {
-            return self::FAILURE;
-        }
-    });
-
-    [$status, $output] = makeRegistry(['name' => 'ReportFormatRegistry', '--key' => 'app.report-formats']);
-
-    expect($status)->toBe(1)
-        ->and($output)->toContain('was not written')
-        ->and(File::exists($this->appPath.'/Registries/ReportFormatRegistry.php'))->toBeTrue();
-});
-
-it('says where the docs page goes when no scaffolder is registered', function () {
+it('says where the docs page goes', function () {
     [$status, $output] = makeRegistry(['name' => 'ReportFormatRegistry', '--key' => 'app.report-formats']);
 
     expect($status)->toBe(0)
         ->and($output)->toContain('docs/registries/app.report-formats.mdx')
-        ->and($output)->toContain(MakeRegistryCommand::SCAFFOLD_COMMAND);
+        ->and($output)->toContain('docs/registries/manifest.json');
 });
 
 it('prints the binding, the bake and the conformance-artifact lines', function () {
