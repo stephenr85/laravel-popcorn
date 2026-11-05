@@ -11,6 +11,7 @@ use Rushing\Popcorn\Registries\Gated;
 use Rushing\Popcorn\Registries\IsRegistry;
 use Rushing\Popcorn\Registries\Key;
 use Rushing\Popcorn\Registries\Nested;
+use Rushing\Popcorn\Registries\Registrant;
 use Rushing\Popcorn\Registries\Registrar;
 use Rushing\Popcorn\Registries\Registry;
 use Rushing\Popcorn\Registries\RegistryKey;
@@ -250,7 +251,7 @@ abstract class ConfigRegistry implements Filled, Gated, Nested, Registry
                 continue;
             }
 
-            $store->register($this->keyFor($index, $entry), $entry, by: "config {$this->configKey()}");
+            $store->register($this->keyFor($index, $entry), $entry, by: Registrant::fromConfig($this->configKey()));
         }
 
         return $store;

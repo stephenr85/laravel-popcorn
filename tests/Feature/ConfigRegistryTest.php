@@ -233,3 +233,11 @@ it('derives keys the same way Key::fromClass does, so a rekey moves nothing by a
     expect((string) Key::fromClass('Schemastud\DataSchemas\Strategies\ValidationAttributeStrategy'))
         ->toBe('validation-attribute-strategy');
 });
+
+it('names every projected entry config:<key>, the registrant vocabulary', function () {
+    config(['fixture.client.sources' => ['defaults' => 'App\Sources\TenantSource']]);
+
+    $store = (fn () => $this->store())->call(app(RealmSourcesRegistry::class));
+
+    expect($store->registrantOf('fixture.client.sources.defaults'))->toBe('config:fixture.client.sources');
+});

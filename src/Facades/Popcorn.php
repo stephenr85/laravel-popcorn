@@ -4,6 +4,7 @@ namespace Rushing\Popcorn\Laravel\Facades;
 
 use Illuminate\Support\Facades\Facade;
 use Rushing\Popcorn\Laravel\PopcornManager;
+use Rushing\Popcorn\Registries\Registrant;
 
 /**
  * Front door to the registry kernel: resolve any key in the estate without naming a registry first.
@@ -15,6 +16,10 @@ use Rushing\Popcorn\Laravel\PopcornManager;
  * ```php
  * Popcorn::pop('beam.particle.resources.invoices');   // routed by longest prefix, no registry named
  * Popcorn::registry('beam.particle.resources');       // the owning registry object, with its sugar
+ *
+ * Popcorn::registeredBy('splicewire/laravel-beam', function (): void {
+ *     // every register() in here that names no $by records 'splicewire/laravel-beam'
+ * });
  * ```
  *
  * @method static mixed pop(\Rushing\Popcorn\Registries\RegistryKey|string $key)
@@ -32,6 +37,25 @@ use Rushing\Popcorn\Laravel\PopcornManager;
  */
 class Popcorn extends Facade
 {
+    /**
+     * Run `$callback` with `$registrant` as the registrant of every write inside it that names nobody.
+     * An explicit `$by` always wins. See {@see Registrant} for the vocabulary (`vendor/name`,
+     * `config:<key>`, `class:<FQCN>`) and why the scope covers only what runs inside the callback.
+     *
+     * A static method on the facade rather than a manager call, so a provider can use it from
+     * `register()` before `PopcornServiceProvider` has bound the manager: the scope is kernel state,
+     * not container state.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function registeredBy(string $registrant, callable $callback): mixed
+    {
+        return Registrant::scoped($registrant, $callback);
+    }
+
     protected static function getFacadeAccessor(): string
     {
         return PopcornManager::class;
