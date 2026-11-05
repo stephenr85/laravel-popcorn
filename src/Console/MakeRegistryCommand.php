@@ -7,7 +7,9 @@ use Illuminate\Console\GeneratorCommand;
 use Rushing\Popcorn\Laravel\Baking\BakedRegistryManifest;
 use Rushing\Popcorn\Registries\ForwardsToRegistryStore;
 use Rushing\Popcorn\Registries\Key;
+use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * `php artisan popcorn:make:registry {name} --key=<root>` (make-surface 05): a new registry class that is
@@ -57,24 +59,47 @@ class MakeRegistryCommand extends GeneratorCommand
     /** The validated root for this run, substituted into the stub. */
     private string $root = '';
 
-    /** `int`, not the framework's `?bool`: a refusal must exit non-zero. */
-    public function handle(): int
+    /** Whether this run refused (an illegal root, or a class that exists without `--force`). */
+    private bool $refused = false;
+
+    /**
+     * `?bool`, the framework's contract for this method; the exit code is {@see execute()}'s. The framework
+     * casts this return value to int, which would turn a refusal (`false`) into exit 0.
+     *
+     * The refusal flag is reset here, once per invocation: Laravel keeps one command instance per kernel, so
+     * an earlier call's refusal must not decide this one.
+     */
+    public function handle(): ?bool
     {
+        $this->refused = false;
+
         $root = $this->rootKey();
 
         if ($root === null) {
-            return self::FAILURE;
+            $this->refused = true;
+
+            return false;
         }
 
         $this->root = $root;
 
         if (parent::handle() === false) {
-            return self::FAILURE;
+            $this->refused = true;
+
+            return false;
         }
 
         $this->nextSteps($this->qualifyClass($this->getNameInput()), $root);
 
-        return self::SUCCESS;
+        return null;
+    }
+
+    /** A refusal exits 1; otherwise the framework's own exit code stands. */
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $status = parent::execute($input, $output);
+
+        return $this->refused ? self::FAILURE : $status;
     }
 
     protected function getStub(): string
